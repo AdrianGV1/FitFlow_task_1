@@ -9,5 +9,4 @@ public class FitFlowApplication {
 	public static void main(String[] args) {
 		SpringApplication.run(FitFlowApplication.class, args);
 	}
-
 }

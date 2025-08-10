@@ -4,13 +4,9 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.util.*;
 
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
 @Entity
 @Table(name = "habits")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 @ToString(onlyExplicitlyIncluded = true)
 public class Habit {
 
@@ -32,7 +28,7 @@ public class Habit {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @ManyToMany(mappedBy = "favoriteHabits", fetch = FetchType.LAZY)
+    @ManyToMany(mappedBy = "habits", fetch = FetchType.LAZY)
     @Builder.Default
     private Set<User> users = new HashSet<>();
 

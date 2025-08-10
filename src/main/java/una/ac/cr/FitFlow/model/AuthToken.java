@@ -6,11 +6,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "auth_token")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class AuthToken {
     @Id
     @Column(length = 255, nullable = false)

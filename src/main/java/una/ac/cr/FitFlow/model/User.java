@@ -2,7 +2,6 @@ package una.ac.cr.FitFlow.model;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.time.Instant;
 import java.util.*;
 
 @Entity
@@ -12,7 +11,6 @@ import java.util.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -33,13 +31,13 @@ public class User {
     private Set<Role> roles = new HashSet<>();
 
     @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(name = "user_habit", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "friend_id"))
+    @JoinTable(name = "user_habit", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "habit_id"))
     @Builder.Default
     private Set<Habit> habits = new HashSet<>();
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Routine> routines;
-
+ 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProgressLog> progressLogs;
 
@@ -47,5 +45,5 @@ public class User {
     private List<AuthToken> authTokens;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Reminder> reminder;
+    private List<Reminder> reminders;
 }

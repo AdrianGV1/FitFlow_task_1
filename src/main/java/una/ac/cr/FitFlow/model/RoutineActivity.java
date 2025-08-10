@@ -3,15 +3,11 @@ package una.ac.cr.FitFlow.model;
 import jakarta.persistence.*;
 import lombok.*;
 
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
 @Entity
 @Table(name = "routine_activities", uniqueConstraints = {
         @UniqueConstraint(name = "uk_routine_habit", columnNames = { "routine_id", "habit_id" })
 })
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class RoutineActivity {
 
     @Id
@@ -29,6 +25,6 @@ public class RoutineActivity {
     @Column(nullable = false)
     private Integer duration;
 
-    @Column(columnDefinition = "TEXT", length = 100)
+    @Column(length = 500)
     private String notes;
 }

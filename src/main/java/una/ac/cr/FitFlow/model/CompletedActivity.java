@@ -1,6 +1,5 @@
 package una.ac.cr.FitFlow.model;
 import java.time.LocalDateTime;
-import org.springframework.cglib.core.Local;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -24,6 +23,6 @@ public class CompletedActivity {
     private ProgressLog progressLog;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "habit", nullable = false)
+    @JoinColumn(name = "habit_id", nullable = false)
     private Habit habit;
 }

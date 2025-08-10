@@ -4,13 +4,9 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.util.*;
 
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
 @Entity
 @Table(name = "routines")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 @ToString(onlyExplicitlyIncluded = true)
 public class Routine {
 

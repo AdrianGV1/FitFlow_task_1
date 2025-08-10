@@ -6,11 +6,7 @@ import java.time.LocalTime;
 
 @Entity
 @Table(name = "reminder")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class Reminder {
 
     public enum Frequency {

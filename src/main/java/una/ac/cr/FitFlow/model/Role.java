@@ -5,16 +5,12 @@ import java.util.Set;
 import jakarta.persistence.*;
 import lombok.*;
 
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
 @Entity
 @Table(name = "roles", uniqueConstraints = {
         @UniqueConstraint(name = "uk_roles_module_permission", columnNames = { "module", "permission" })
 })
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 @ToString(onlyExplicitlyIncluded = true)
 public class Role {
 

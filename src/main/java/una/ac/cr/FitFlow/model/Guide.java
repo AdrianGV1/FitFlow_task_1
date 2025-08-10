@@ -4,13 +4,9 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.util.*;
 
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
 @Entity
 @Table(name = "guides")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 @ToString(onlyExplicitlyIncluded = true)
 public class Guide {
 

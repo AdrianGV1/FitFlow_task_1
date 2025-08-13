@@ -1,30 +1,31 @@
 package una.ac.cr.FitFlow.dto;
 
-import java.time.LocalDateTime;
-import jakarta.validation.constraints.FutureOrPresent;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.*;
 import lombok.*;
+import java.time.LocalDateTime;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class ReminderDTO {
 
+    public interface OnCreate {}
+    public interface OnUpdate {}
+
+    @NotNull(groups = OnUpdate.class)
     private Long id;
 
-    @NotNull
+    @NotNull(groups = OnCreate.class)
+    @Positive(groups = {OnCreate.class, OnUpdate.class})
     private Long userId;
 
-    @NotNull
+    @NotNull(groups = OnCreate.class)
+    @Positive(groups = {OnCreate.class, OnUpdate.class})
     private Long habitId;
 
-    @NotNull
-    @FutureOrPresent
+    @NotNull(groups = OnCreate.class)
+    @FutureOrPresent(groups = {OnCreate.class, OnUpdate.class})
     private LocalDateTime time;
 
-    @NotBlank
+    @NotBlank(groups = OnCreate.class)
+    @Size(max = 20, groups = {OnCreate.class, OnUpdate.class})
     private String frequency;
 }
-

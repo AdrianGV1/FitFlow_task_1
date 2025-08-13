@@ -1,23 +1,22 @@
 package una.ac.cr.FitFlow.dto;
 
-import java.util.Set;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.*;
 import lombok.*;
+import java.util.Set;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class RoleDTO {
 
+    public interface OnCreate {}
+    public interface OnUpdate {}
+
+    @NotNull(groups = OnUpdate.class)
     private Long id;
 
-    @NotBlank
+    @NotBlank(groups = OnCreate.class)
+    @Size(max = 50, groups = {OnCreate.class, OnUpdate.class})
     private String name;
 
-    @NotEmpty
-    private Set<String> permissions;
+    @NotEmpty(groups = OnCreate.class)
+    private Set<@NotBlank String> permissions;
 }
-
-

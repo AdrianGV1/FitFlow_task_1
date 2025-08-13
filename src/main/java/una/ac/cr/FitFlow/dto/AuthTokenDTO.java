@@ -1,26 +1,30 @@
 package una.ac.cr.FitFlow.dto;
 
+import jakarta.validation.constraints.*;
 import java.time.LocalDateTime;
-import jakarta.validation.constraints.Future;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class AuthTokenDTO {
 
-    @NotBlank
+    public interface OnCreate {}
+    public interface OnUpdate {}
+
+    @NotNull(groups = OnUpdate.class)
+    private Long id;
+
+    @NotBlank(groups = OnCreate.class)
+    @Size(max = 2048, groups = {OnCreate.class, OnUpdate.class})
     private String token;
 
-    @NotNull
-    @Future
+    @NotNull(groups = OnCreate.class)
+    @Future(groups = {OnCreate.class, OnUpdate.class})
     private LocalDateTime expiresAt;
 
-    @NotNull
+    @NotNull(groups = OnCreate.class)
+    @Positive(groups = {OnCreate.class, OnUpdate.class})
     private Long userId;
 }
+
 
 

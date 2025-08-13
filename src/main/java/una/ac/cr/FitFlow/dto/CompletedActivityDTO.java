@@ -1,29 +1,32 @@
 package una.ac.cr.FitFlow.dto;
 
+import jakarta.validation.constraints.*;
 import java.time.LocalDateTime;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 import lombok.*;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class CompletedActivityDTO {
 
+    public interface OnCreate {}
+    public interface OnUpdate {}
+
+    @NotNull(groups = OnUpdate.class)
     private Long id;
 
-    @NotNull
+    @NotNull(groups = OnCreate.class)
     private LocalDateTime completedAt;
 
-    @Size(max = 500)
+    @Size(max = 500, groups = {OnCreate.class, OnUpdate.class})
     private String notes;
 
-    @NotNull
+    @NotNull(groups = OnCreate.class)
+    @Positive(groups = {OnCreate.class, OnUpdate.class})
     private Long progressLogId;
 
-    @NotNull
+    @NotNull(groups = OnCreate.class)
+    @Positive(groups = {OnCreate.class, OnUpdate.class})
     private Long habitId;
 }
+
 
 

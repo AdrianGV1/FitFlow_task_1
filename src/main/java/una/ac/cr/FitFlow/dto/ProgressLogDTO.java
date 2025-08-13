@@ -1,29 +1,30 @@
 package una.ac.cr.FitFlow.dto;
 
+import jakarta.validation.constraints.*;
+import lombok.*;
 import java.time.LocalDateTime;
 import java.util.List;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
-import lombok.*;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class ProgressLogDTO {
 
+    public interface OnCreate {}
+    public interface OnUpdate {}
+
+    @NotNull(groups = OnUpdate.class)
     private Long id;
 
-    @NotNull
+    @NotNull(groups = OnCreate.class)
+    @Positive(groups = {OnCreate.class, OnUpdate.class})
     private Long userId;
 
-    @NotNull
+    @NotNull(groups = OnCreate.class)
+    @Positive(groups = {OnCreate.class, OnUpdate.class})
     private Long routineId;
 
-    @NotNull
+    @NotNull(groups = OnCreate.class)
+    @PastOrPresent(groups = {OnCreate.class, OnUpdate.class})
     private LocalDateTime date;
 
-    @NotEmpty
-    private List<Long> completedActivityIds;
+    private List<@NotNull @Positive Long> completedActivityIds;
 }
-

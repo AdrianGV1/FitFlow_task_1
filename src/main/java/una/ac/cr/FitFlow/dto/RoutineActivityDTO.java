@@ -1,32 +1,33 @@
 package una.ac.cr.FitFlow.dto;
 
-import java.time.LocalTime;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 import lombok.*;
+import java.time.LocalTime;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class RoutineActivityDTO {
 
+    public interface OnCreate {}
+    public interface OnUpdate {}
+
+    @NotNull(groups = OnUpdate.class)
     private Long id;
 
-    @NotNull
+    @NotNull(groups = OnCreate.class)
+    @Positive(groups = {OnCreate.class, OnUpdate.class})
     private Long routineId;
 
-    @NotNull
+    @NotNull(groups = OnCreate.class)
+    @Positive(groups = {OnCreate.class, OnUpdate.class})
     private Long habitId;
 
-    @NotNull
-    @Min(1)
-    private Integer duration; 
+    @NotNull(groups = OnCreate.class)
+    @Min(value = 1, groups = {OnCreate.class, OnUpdate.class})
+    private Integer duration;
 
+    @NotNull(groups = OnCreate.class)
     private LocalTime targetTime;
 
-    @Size(max = 500)
+    @Size(max = 500, groups = {OnCreate.class, OnUpdate.class})
     private String notes;
 }
-

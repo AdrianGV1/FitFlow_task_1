@@ -1,30 +1,32 @@
 package una.ac.cr.FitFlow.dto;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
-import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.*;
 import lombok.*;
 import java.util.Set;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class GuideDTO {
 
-    @NotBlank
-    @Size(max = 150)
+    public interface OnCreate {}
+    public interface OnUpdate {}
+
+    @NotNull(groups = OnUpdate.class)
+    private Long id;
+
+    @NotBlank(groups = OnCreate.class)
+    @Size(max = 150, groups = {OnCreate.class, OnUpdate.class})
     private String title;
 
-    @NotBlank
+    @NotBlank(groups = OnCreate.class)
+    @Size(max = 10000, groups = {OnCreate.class, OnUpdate.class})
     private String content;
-
-    @NotBlank
+    
+    @NotBlank(groups = OnCreate.class)
+    @Size(max = 20, groups = {OnCreate.class, OnUpdate.class})
     private String category;
 
-    @NotNull
-    @NotEmpty
-    private Set<Long> recommendedHabitIds;
+    @NotEmpty(groups = OnCreate.class)
+    private Set<@NotNull @Positive Long> recommendedHabitIds;
 }
+
 

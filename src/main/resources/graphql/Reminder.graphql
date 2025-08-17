@@ -1,0 +1,44 @@
+scalar DateTime
+enum ReminderFrequency { DAILY WEEKLY }
+
+extend type Query{
+    reminderById(id: ID!): Reminder
+    reminders(page: Int!, size: Int!): ReminderPage!
+    remindersByUser(userId: ID!, page: Int!, size: Int!): ReminderPage!
+}
+
+extend type Mutation{
+    createReminder(input: ReminderCreateInput!): Reminder!
+    updateReminder(id: ID!, input: ReminderUpdateInput!): Reminder!
+    deleteReminder(id: ID!): Boolean!
+}
+
+type Reminder {
+    id: ID!
+    userId: ID!
+    habitId: ID!
+    time: DateTime!
+    frequency: ReminderFrequency!
+}
+
+input ReminderCreateInput {
+    userId: ID!
+    habitId: ID!
+    time: DateTime!
+    frequency: ReminderFrequency!
+}
+
+input ReminderUpdateInput {
+    userId: ID
+    habitId: ID
+    time: DateTime
+    frequency: ReminderFrequency
+}
+
+type ReminderPage {
+    content: [Reminder!]!
+    totalElements: Int!
+    totalPages: Int!
+    pageNumber: Int!
+    pageSize: Int!
+}

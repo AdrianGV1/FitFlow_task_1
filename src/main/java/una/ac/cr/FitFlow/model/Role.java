@@ -10,7 +10,11 @@ import lombok.*;
         @UniqueConstraint(name = "uk_roles_module_permission", columnNames = { "module", "permission" })
 })
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 @ToString(onlyExplicitlyIncluded = true)
 public class Role {
 

@@ -1,4 +1,5 @@
 package una.ac.cr.FitFlow.model;
+
 import java.time.LocalDateTime;
 
 import jakarta.persistence.*;
@@ -6,7 +7,11 @@ import lombok.*;
 
 @Entity
 @Table(name = "completed_activities")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class CompletedActivity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -14,7 +19,7 @@ public class CompletedActivity {
 
     @Column(name = "completed_at", nullable = false)
     private LocalDateTime completedAt;
-    
+
     @Column(name = "notes", length = 500)
     private String notes;
 

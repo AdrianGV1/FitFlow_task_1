@@ -1,0 +1,39 @@
+enum GuideCategory { PHYSICAL, MENTAL, SLEEP, DIET }
+
+type Query{
+    guideById(id: ID!): Guide
+    guides(page: Int!, size: Int!, keyword: String!): GuidePage!
+}
+
+type Mutation{
+    createGuide(input: GuideCreateInput!): Guide!
+    updateGuide(id: ID!, input: GuideUpdateInput!): Guide!
+    deleteGuide(id: ID!): Boolean!
+}
+
+type Guide{
+    id: ID!
+    title: String!
+    content: String!
+    category: GuideCategory
+}
+
+input GuideCreateInput{
+    title: String!
+    content: String!
+    category: GuideCategory!
+}
+
+input GuideUpdateInput{
+    title: String!
+    content: String!
+    category: GuideCategory!
+}
+
+type GuidePage{
+    content: [Guide]!
+    totalElements: Int!
+    totalPage: Int!
+    pageNumber: Int!
+    pageSize: Int!
+}

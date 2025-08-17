@@ -1,0 +1,40 @@
+extend type Query{
+    RoutineById(id: ID!): Routine
+    Routines(page: Int!, size: Int!, keyword: String): Routines!
+}
+
+extend type Mutation{
+    createRoutine(input: RoutineCreateInput!): Routine!
+    updateRoutine(id: ID!, input: RoutineUpdateInput!): Routine!
+    deleteRoutine(id: ID!): Boolean!
+}
+
+type Routine{
+    id: ID!
+    title: String!
+    userId: ID!
+    daysOfWeek: [String!]
+    activityId: [ID!]!
+}
+
+input RoutineCreateInput {
+  title: String!
+  userId: ID!
+  daysOfWeek: [String!]
+  activityIds: [ID!]
+}
+
+input RoutineUpdateInput {
+  title: String
+  userId: ID
+  daysOfWeek: [String!]
+  activityIds: [ID!]
+}
+
+type RoutinePage {
+  content: [Routine!]!
+  totalElements: Int!
+  totalPages: Int!
+  pageNumber: Int!
+  pageSize: Int!
+}

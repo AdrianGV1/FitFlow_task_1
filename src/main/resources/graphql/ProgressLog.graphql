@@ -1,0 +1,44 @@
+scalar Date
+
+extend type Query{
+    progressLogById(id: ID!): ProgressLog
+    progressLogs(page: Int!, size: Int!): ProgressLogPage!
+    progressLogsByUser(userId: ID!, page: Int!, size: Int!): ProgressLogPage!
+    progressLogsByUserAndDate(userId: ID!, date: Date!): [ProgressLog!]!
+}
+
+extend type Mutation{
+    createProgressLog(input: ProgressLogCreateInput!): ProgressLog!
+    updateProgressLog(id: ID!, input: ProgressLogUpdateInput!): ProgressLog!
+    deleteProgressLog(id: ID!): Boolean!
+}
+
+type ProgressLog {
+    id: ID!
+    userId: ID!
+    routineId: ID!
+    date: Date!
+    completedActivityIds: [ID!]!
+}
+
+input ProgressLogCreateInput {
+    userId: ID!
+    routineId: ID!
+    date: Date!
+    completedActivityIds: [ID!]
+}
+
+input ProgressLogUpdateInput {
+    userId: ID
+    routineId: ID
+    date: Date
+    completedActivityIds: [ID!]
+}
+
+type ProgressLogPage {
+    content: [ProgressLog!]!
+    totalElements: Int!
+    totalPages: Int!
+    pageNumber: Int!
+    pageSize: Int!
+}

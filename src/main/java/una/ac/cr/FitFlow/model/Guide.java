@@ -6,12 +6,16 @@ import java.util.*;
 
 @Entity
 @Table(name = "guides")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 @ToString(onlyExplicitlyIncluded = true)
 public class Guide {
 
     public enum Category {
-        PHYSICAL, MENTAL, SLEEP, DIET
+
     }
 
     @Id

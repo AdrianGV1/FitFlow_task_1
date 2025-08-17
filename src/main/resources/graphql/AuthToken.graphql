@@ -1,0 +1,32 @@
+scalar DataTime
+
+extend type Query{
+    authTokenById(id: ID!): AuthToken
+    authTokens(page: Int!, size: Int!, keyword: String): AuthTokenPage!
+}
+
+extend type Mutatation{
+    createAuthToken(input: AuthTokenCreateInput!): AuthToken!
+    deleteAuthToken(id: ID!): Boolean!
+}
+
+type AuthToken{
+    id: ID!
+    token: String!
+    expiresAt: DataTime!
+    user: User!
+}
+
+input AuthTokenCreateInput{
+    token: String!
+    expiresAt: DataTime!
+    userId: ID!
+}
+
+type AuthTokenPage{
+    content: [AuthToken]!
+    totalElements: Int!
+    totalPage: Int!
+    pageNumber: Int!
+    pageSize: Int!
+}

@@ -7,7 +7,11 @@ import lombok.*;
 @Table(name = "routine_activities", uniqueConstraints = {
         @UniqueConstraint(name = "uk_routine_habit", columnNames = { "routine_id", "habit_id" })
 })
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class RoutineActivity {
 
     @Id

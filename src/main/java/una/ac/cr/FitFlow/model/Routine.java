@@ -6,7 +6,11 @@ import java.util.*;
 
 @Entity
 @Table(name = "routines")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 @ToString(onlyExplicitlyIncluded = true)
 public class Routine {
 

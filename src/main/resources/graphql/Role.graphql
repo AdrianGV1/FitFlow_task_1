@@ -1,0 +1,38 @@
+scalar DateTime
+
+enum Permission { EDITOR, AUDITOR }
+
+extend type Query{
+    roleById(id: ID!): Role
+    roles(page: Int!, size: Int!): RolePage!
+}
+
+extend type Mutation{
+    createRole(input: RoleCreateInput!): Role!
+    updateRole(id: ID!, input: RoleUpdateInput!): Role!
+    deleteRole(id: ID!): Boolean!
+}
+
+type Role {
+    id: ID!
+    name: String!
+    description: String
+}
+
+input RoleCreateInput {
+    name: String!
+    description: String
+}
+
+input RoleUpdateInput {
+    name: String
+    description: String
+}
+
+type RolePage {
+    content: [Role!]!
+    totalElements: Int!
+    totalPages: Int!
+    pageNumber: Int!
+    pageSize: Int!
+}

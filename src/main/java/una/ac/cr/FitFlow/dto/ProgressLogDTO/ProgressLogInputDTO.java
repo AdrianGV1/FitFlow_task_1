@@ -1,0 +1,26 @@
+package una.ac.cr.FitFlow.dto.ProgressLogDTO;
+
+import jakarta.validation.constraints.*;
+import lombok.*;
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class ProgressLogInputDTO {
+
+    private Long id;
+
+    @NotNull
+    @Positive
+    private Long userId;
+
+    @NotNull
+    @Positive
+    private Long routineId;
+
+    @NotNull
+    @PastOrPresent
+    private LocalDateTime date;
+
+    private List<@NotNull @Positive Long> completedActivityIds;
+}

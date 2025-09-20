@@ -22,7 +22,6 @@ public class ReminderInputDTO {
     private String message;
 
     @NotNull
-    @FutureOrPresent
     private LocalDateTime time;
 
     @NotBlank

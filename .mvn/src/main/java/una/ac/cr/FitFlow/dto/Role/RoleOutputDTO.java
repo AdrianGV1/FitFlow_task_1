@@ -1,12 +1,12 @@
 package una.ac.cr.FitFlow.dto.Role;
 
 import lombok.*;
-import java.util.Set;
+import una.ac.cr.FitFlow.model.Role;
 
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class RoleOutputDTO {
-
-    private Long id;
-    private String name;
-    private Set<String> permissions;
+    private Long id;                     
+    private String name;                 
+    private Role.Permission permissions; 
+    private Role.Module module;          
 }

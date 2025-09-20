@@ -8,19 +8,15 @@ import java.util.Set;
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class RoutineInputDTO {
 
-    private Long id;
+    private Long id; 
 
-    @NotBlank
     @Size(max = 150)
-    private String title;
+    private String title;              
 
-    @NotNull
     @Positive
-    private Long userId;
+    private Long userId;               
 
-    @NotEmpty
-    private Set<@NotBlank String> daysOfWeek;
+    private Set<@NotBlank String> daysOfWeek; 
 
-    @NotEmpty
-    private List<@NotNull @Positive Long> activityIds;
+    private List<@NotNull @Positive Long> activityIds; 
 }

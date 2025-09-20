@@ -10,6 +10,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import una.ac.cr.FitFlow.model.ProgressLog;
 
 public interface ProgressLogRepository extends JpaRepository<ProgressLog, Long> {
-    List<ProgressLog> findByUserIdAndLogDate(Long userId, LocalDate date);
-    Page<ProgressLog> findByUserId(Long userId, Pageable p);
+
+    List<ProgressLog> findByUser_IdAndLogDate(Long userId, LocalDate date);
+
+    Page<ProgressLog> findByUser_Id(Long userId, Pageable pageable);
 }

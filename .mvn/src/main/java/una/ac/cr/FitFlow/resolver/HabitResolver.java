@@ -1,49 +1,51 @@
 package una.ac.cr.FitFlow.resolver;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.graphql.data.method.annotation.Argument;
-import org.springframework.graphql.data.method.annotation.MutationMapping;
-import org.springframework.graphql.data.method.annotation.QueryMapping;
+import org.springframework.graphql.data.method.annotation.*;
 import org.springframework.stereotype.Controller;
 
-import lombok.RequiredArgsConstructor;
-import una.ac.cr.FitFlow.dto.HabitDTO;
-import una.ac.cr.FitFlow.dto.HabitPageDTO;
+import una.ac.cr.FitFlow.dto.Habit.HabitInputDTO;
+import una.ac.cr.FitFlow.dto.Habit.HabitOutputDTO;
+import una.ac.cr.FitFlow.dto.Habit.HabitPageDTO;
 import una.ac.cr.FitFlow.service.Habit.HabitService;
 
 @Controller
 @RequiredArgsConstructor
 public class HabitResolver {
+
     private final HabitService habitService;
 
     @QueryMapping(name = "habitById")
-    public HabitDTO habitById(@Argument("id") Long id) {
+    public HabitOutputDTO habitById(@Argument("id") Long id) {
         return habitService.findHabitById(id);
     }
 
     @QueryMapping(name = "habits")
-    public HabitPageDTO habits(@Argument("page") int page, @Argument("size") int size,
-            @Argument("keyword") String keyword) {
+    public HabitPageDTO habits(@Argument("page") int page,
+                               @Argument("size") int size,
+                               @Argument("keyword") String keyword) {
         Pageable pageable = Pageable.ofSize(size).withPage(page);
-        Page<HabitDTO> pageResult = habitService.listHabits(keyword, pageable);
+        Page<HabitOutputDTO> p = habitService.listHabits(keyword, pageable);
         return HabitPageDTO.builder()
-                .content(pageResult.getContent())
-                .totalElements(pageResult.getTotalElements())
-                .totalPages(pageResult.getTotalPages())
-                .pageNumber(pageResult.getNumber())
-                .pageSize(pageResult.getSize())
+                .content(p.getContent())
+                .totalElements(p.getTotalElements())
+                .totalPages(p.getTotalPages())
+                .pageNumber(p.getNumber())
+                .pageSize(p.getSize())
                 .build();
     }
 
     @MutationMapping(name = "createHabit")
-    public HabitDTO createHabit(@Argument("input") HabitDTO habit) {
-        return habitService.createHabit(habit);
+    public HabitOutputDTO createHabit(@Argument("input") HabitInputDTO input) {
+        return habitService.createHabit(input);
     }
 
     @MutationMapping(name = "updateHabit")
-    public HabitDTO updateHabit(@Argument("id") Long id, @Argument("input") HabitDTO habit) {
-        return habitService.updateHabit(id, habit);
+    public HabitOutputDTO updateHabit(@Argument("id") Long id,
+                                      @Argument("input") HabitInputDTO input) {
+        return habitService.updateHabit(id, input);
     }
 
     @MutationMapping(name = "deleteHabit")

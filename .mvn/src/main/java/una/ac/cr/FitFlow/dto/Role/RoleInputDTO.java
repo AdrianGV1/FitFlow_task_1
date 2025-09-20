@@ -2,7 +2,7 @@ package una.ac.cr.FitFlow.dto.Role;
 
 import jakarta.validation.constraints.*;
 import lombok.*;
-import java.util.Set;
+import una.ac.cr.FitFlow.model.Role;
 
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class RoleInputDTO {
@@ -11,8 +11,11 @@ public class RoleInputDTO {
 
     @NotBlank
     @Size(max = 50)
-    private String name;
+    private String name; 
 
-    @NotEmpty
-    private Set<@NotBlank String> permissions;
+    @NotNull
+    private Role.Permission permissions; 
+
+    @NotNull
+    private Role.Module module;          
 }

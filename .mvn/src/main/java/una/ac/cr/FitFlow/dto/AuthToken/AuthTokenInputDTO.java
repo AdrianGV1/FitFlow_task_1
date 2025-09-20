@@ -7,17 +7,12 @@ import lombok.*;
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class AuthTokenInputDTO {
 
-    private Long id;
-
     @NotBlank
-    @Size(max = 2048)
-    private String token;
+    private String token;                
 
     @NotNull
-    @Future
-    private LocalDateTime expiresAt;
+    private LocalDateTime expiresAt;     
 
-    @NotNull
-    @Positive
+    @NotNull @Positive
     private Long userId;
 }

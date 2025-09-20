@@ -2,20 +2,16 @@ package una.ac.cr.FitFlow.service.RoutineActivity;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import una.ac.cr.FitFlow.dto.RoutineActivityDTO;
+
+import una.ac.cr.FitFlow.dto.RoutineActivity.RoutineActivityInputDTO;
+import una.ac.cr.FitFlow.dto.RoutineActivity.RoutineActivityOutputDTO;
 
 public interface RoutineActivityService {
-    RoutineActivityDTO create(RoutineActivityDTO dto);
-
-    RoutineActivityDTO update(Long id, RoutineActivityDTO dto);
-
+    RoutineActivityOutputDTO create(RoutineActivityInputDTO dto);
+    RoutineActivityOutputDTO update(Long id, RoutineActivityInputDTO dto);
     void delete(Long id);
-
-    RoutineActivityDTO findById(Long id);
-
-    Page<RoutineActivityDTO> list(Pageable pageable);
-
-    Page<RoutineActivityDTO> listByRoutineId(Long routineId, Pageable pageable);
-
-    Page<RoutineActivityDTO> listByHabitId(Long habitId, Pageable pageable);
+    RoutineActivityOutputDTO findById(Long id);
+    Page<RoutineActivityOutputDTO> list(Pageable pageable);
+    Page<RoutineActivityOutputDTO> listByRoutineId(Long routineId, Pageable pageable);
+    Page<RoutineActivityOutputDTO> listByHabitId(Long habitId, Pageable pageable);
 }

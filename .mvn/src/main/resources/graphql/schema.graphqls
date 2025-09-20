@@ -291,6 +291,7 @@ type User {
   username: String!
   email: String!
   roles: [Role!]!
+  habits: [Habit!]!
 }
 
 input UserCreateInput {
@@ -298,7 +299,7 @@ input UserCreateInput {
   password: String!
   email: String!
   roleIds: [ID!]!
-  favoriteHabitIds: [ID!]
+  habitIds: [ID!]
 }
 
 input UserUpdateInput {
@@ -306,7 +307,7 @@ input UserUpdateInput {
   password: String
   email: String
   roleIds: [ID!]
-  favoriteHabitIds: [ID!]
+  habitIds: [ID!]
 }
 
 type UserPage {
@@ -316,6 +317,7 @@ type UserPage {
   pageNumber: Int!
   pageSize: Int!
 }
+
 
 type ProgressLog {
   id: ID!

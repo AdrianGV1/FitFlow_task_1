@@ -2,28 +2,21 @@ package una.ac.cr.FitFlow.dto.RoutineActivity;
 
 import jakarta.validation.constraints.*;
 import lombok.*;
-import java.time.LocalTime;
 
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class RoutineActivityInputDTO {
 
-    private Long id;
+    private Long id; 
 
-    @NotNull
-    @Positive
+    @NotNull @Positive
     private Long routineId;
 
-    @NotNull
-    @Positive
+    @NotNull @Positive
     private Long habitId;
 
-    @NotNull
-    @Min(value = 1)
+    @NotNull @Min(1)
     private Integer duration;
 
-    @NotNull
-    private LocalTime targetTime;
-
     @Size(max = 500)
-    private String notes;
+    private String notes; 
 }

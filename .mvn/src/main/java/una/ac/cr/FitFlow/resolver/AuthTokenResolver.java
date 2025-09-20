@@ -11,43 +11,44 @@ import org.springframework.data.domain.Pageable;
 
 import jakarta.validation.Valid;
 
-
-import una.ac.cr.FitFlow.dto.AuthTokenPageDTO;
+import una.ac.cr.FitFlow.dto.AuthToken.AuthTokenPageDTO;
+import una.ac.cr.FitFlow.dto.AuthToken.AuthTokenInputDTO;
 import una.ac.cr.FitFlow.dto.AuthToken.AuthTokenOutputDTO;
 import una.ac.cr.FitFlow.service.AuthToken.AuthTokenService;
 import una.ac.cr.FitFlow.service.user.UserService;
-import una.ac.cr.FitFlow.dto.AuthTokenDTO;
-import una.ac.cr.FitFlow.dto.User.UserOutputDTO;    
+import una.ac.cr.FitFlow.dto.User.UserOutputDTO;
 
 @RequiredArgsConstructor
 @Controller
 @Validated
 public class AuthTokenResolver {
+
     private final AuthTokenService authTokenService;
     private final UserService userService;
 
     @QueryMapping(name = "authTokenById")
-    public AuthTokenDTO authTokenById(@Argument("tokenId") String tokenId) {
+    public AuthTokenOutputDTO authTokenById(@Argument("tokenId") String tokenId) {
         return authTokenService.findByToken(tokenId);
     }
 
     @QueryMapping(name = "authTokensByUserId")
     public AuthTokenPageDTO authTokensByUserId(@Argument("userId") Long userId,
-            @Argument("page") int page, @Argument("size") int size) {
+                                               @Argument("page") int page,
+                                               @Argument("size") int size) {
         Pageable pageable = PageRequest.of(page, size);
-        Page<AuthTokenDTO> pageResult = authTokenService.listByUserId(userId, pageable);
+        Page<AuthTokenOutputDTO> p = authTokenService.listByUserId(userId, pageable);
         return AuthTokenPageDTO.builder()
-                .content(pageResult.getContent())
-                .totalElements(pageResult.getTotalElements())
-                .totalPages(pageResult.getTotalPages())
-                .pageNumber(pageResult.getNumber())
-                .pageSize(pageResult.getSize())
+                .content(p.getContent())
+                .totalElements(p.getTotalElements())
+                .totalPages(p.getTotalPages())
+                .pageNumber(p.getNumber())
+                .pageSize(p.getSize())
                 .build();
     }
 
     @MutationMapping(name = "createAuthToken")
-    public AuthTokenDTO createAuthToken(@Valid @Argument("input") AuthTokenDTO authTokenDTO) {
-        return authTokenService.create(authTokenDTO);
+    public AuthTokenOutputDTO createAuthToken(@Valid @Argument("input") AuthTokenInputDTO input) {
+        return authTokenService.create(input);
     }
 
     @MutationMapping(name = "deleteAuthToken")
@@ -59,15 +60,8 @@ public class AuthTokenResolver {
         return true;
     }
 
-    @SchemaMapping(typeName = "AuthToken")
-    public UserOutputDTO user(Object token) {
-        Long userId = null;
-        if (token instanceof AuthTokenDTO authTokenDTO) {
-            userId = authTokenDTO.getUserId();
-        } else if (token instanceof AuthTokenOutputDTO authTokenOutputDTO) {
-            userId = authTokenOutputDTO.getUserId();
-        }
-        return userId != null ? userService.findUserById(userId) : null;
+    @SchemaMapping(typeName = "AuthToken", field = "user")
+    public UserOutputDTO user(AuthTokenOutputDTO token) {
+        return userService.findUserById(token.getUserId());
     }
 }
-

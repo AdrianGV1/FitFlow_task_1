@@ -8,9 +8,9 @@ import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.stereotype.Controller;
 
 import lombok.RequiredArgsConstructor;
-import una.ac.cr.FitFlow.dto.RolePageDTO;
 import una.ac.cr.FitFlow.dto.Role.RoleInputDTO;
 import una.ac.cr.FitFlow.dto.Role.RoleOutputDTO;
+import una.ac.cr.FitFlow.dto.Role.RolePageDTO;
 import una.ac.cr.FitFlow.service.role.RoleService;
 
 @Controller

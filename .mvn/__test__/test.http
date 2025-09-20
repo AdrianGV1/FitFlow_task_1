@@ -1,0 +1,20 @@
+### Reminder por ID
+POST http://localhost:8080/graphql
+Content-Type: application/json
+# Authorization: Bearer {{jwt}}
+X-REQUEST-TYPE: GraphQL
+
+query ($id: ID!) {
+  reminderById(id: $id) {
+    id
+    userId
+    habitId
+    message
+    time
+    frequency
+  }
+}
+
+{
+  "id": "rem_001"
+}

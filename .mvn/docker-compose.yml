@@ -1,0 +1,61 @@
+services:
+  mariadb:
+    image: mariadb:10.11
+    container_name: fitflow-mariadb
+    restart: unless-stopped
+    ports:
+      - "${FITFLOW_DB_PORT:-3308}:3306"
+    environment:
+      MARIADB_ROOT_PASSWORD: ${FITFLOW_DB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${FITFLOW_DB_NAME}
+      MARIADB_USER: ${FITFLOW_DB_USER}
+      MARIADB_PASSWORD: ${FITFLOW_DB_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--su-mysql", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: fitflow-phpmyadmin
+    restart: unless-stopped
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    environment:
+      PMA_HOST: mariadb
+      PMA_USER: ${FITFLOW_DB_USER}
+      PMA_PASSWORD: ${FITFLOW_DB_PASSWORD}
+    ports:
+            - "${FITFLOW_PHPMYADMIN_PORT:-8081}:80"
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: fitflow-app
+    container_name: fitflow-app
+    restart: unless-stopped
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    ports:
+      - "${FITFLOW_APP_PORT:-9090}:8080"
+    env_file:
+      - .env
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mariadb://mariadb:3306/${FITFLOW_DB_NAME:-fitflow_db}
+      - SPRING_DATASOURCE_USERNAME=${FITFLOW_DB_USER:-fitflow}
+      - SPRING_DATASOURCE_PASSWORD=${FITFLOW_DB_PASSWORD:-fitpass}
+      - SPRING_GRAPHQL_HTTP_PATH=/graphql
+      - SPRING_GRAPHQL_GRAPHIQL_ENABLED=true
+      - SPRING_GRAPHQL_GRAPHIQL_CDN_ENABLED=false
+      - SPRING_GRAPHQL_GRAPHIQL_PATH=/graphiql
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,mappings
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY=DEBUG
+
+volumes:
+  db_data:

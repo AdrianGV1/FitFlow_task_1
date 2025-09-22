@@ -1,23 +1,31 @@
--- FitFlow heavy seed (~500k completed_activities)
--- Esquema: fitflow_db (MariaDB 10.11+)
--- CTEs locales por sentencia (no globales)
+-- FitFlow heavy seed (~500k registros en completed_activities)
+-- Compatible con esquema fitflow_db (MariaDB 10.11+)
+-- Autor: ChatGPT (ajustado para anonimo)
 
 SET NAMES utf8mb4;
 
--- Aumentar límite de iteraciones recursivas
-SET SESSION max_recursive_iterations = 10000;
+-- Semilla fija para determinismo
+SET @rand_seed := 20250922;
+SELECT RAND(@rand_seed);
+SET @fixed_ts := 1735689600;          -- 2024-12-31 00:00:00 UTC
+SET timestamp = @fixed_ts;
 
--- Parámetros
-SET @N_USERS := 5000;
-SET @N_COACHES := 80;
-SET @ROUTINES_PER_USER := 2;
-SET @LOGS_PER_ROUTINE := 5;
-SET @COMPLETED_PER_LOG := 10;
+-- ===========================
+-- Parámetros de volumen
+-- ===========================
+SET @N_USERS := 5000;          -- usuarios
+SET @N_COACHES := 80;          -- primeros son coaches
+SET @ROUTINES_PER_USER := 2;   -- rutinas por usuario
+SET @LOGS_PER_ROUTINE := 5;    -- logs por rutina
+SET @COMPLETED_PER_LOG := 10;  -- completados por log → 500k
 SET @ACTIVITIES_PER_ROUTINE := 3;
-SET @N_HABITS := 120;
-SET @N_GUIDES := 40;
-SET @FAVS_PER_USER := 3;
+SET @N_HABITS := 120;          -- hábitos
+SET @N_GUIDES := 40;           -- guías
+SET @FAVS_PER_USER := 3;       -- hábitos favoritos
 
+-- ===========================
+-- Limpieza inicial
+-- ===========================
 START TRANSACTION;
 SET FOREIGN_KEY_CHECKS = 0;
 SET UNIQUE_CHECKS = 0;
@@ -34,28 +42,39 @@ TRUNCATE TABLE user_roles;
 TRUNCATE TABLE habits;
 TRUNCATE TABLE roles;
 TRUNCATE TABLE users;
-TRUNCATE TABLE auth_token;
 
 SET FOREIGN_KEY_CHECKS = 1;
 
--- 1) Roles (simple y re-ejecutable)
-INSERT IGNORE INTO roles (module, permission) VALUES
-  ('ACTIVIDADES','AUDITOR'),
-  ('ACTIVIDADES','EDITOR'),
-  ('RUTINAS','AUDITOR'),
-  ('RUTINAS','EDITOR'),
-  ('RECORDATORIOS','AUDITOR'),
-  ('RECORDATORIOS','EDITOR'),
-  ('PROGRESO','AUDITOR'),
-  ('PROGRESO','EDITOR'),
-  ('GUIAS','AUDITOR'),
-  ('GUIAS','EDITOR');
+-- ===========================
+-- Secuencias
+-- ===========================
+WITH RECURSIVE
+s_users AS (SELECT 1 AS seq UNION ALL SELECT seq+1 FROM s_users WHERE seq < @N_USERS),
+s_habits AS (SELECT 1 AS seq UNION ALL SELECT seq+1 FROM s_habits WHERE seq < @N_HABITS),
+s_guides AS (SELECT 1 AS seq UNION ALL SELECT seq+1 FROM s_guides WHERE seq < @N_GUIDES),
+s2 AS (SELECT 1 AS seq UNION ALL SELECT 2),
+s3 AS (SELECT 1 AS seq UNION ALL SELECT 2 UNION ALL SELECT 3),
+s5 AS (SELECT 1 AS seq UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5),
+s10 AS (SELECT 1 AS seq UNION ALL SELECT seq+1 FROM s10 WHERE seq < @COMPLETED_PER_LOG)
+SELECT 1;
 
--- 2) Users: coaches primero
-INSERT INTO users (username, email, password, coach_id)
-WITH RECURSIVE u(seq) AS (
-  SELECT 1 UNION ALL SELECT seq+1 FROM u WHERE seq < @N_COACHES
-),
+-- ===========================
+-- 1) Roles
+-- ===========================
+INSERT INTO roles (module, permission)
+SELECT module, permission
+FROM (
+  SELECT 'ACTIVIDADES','AUDITOR' UNION ALL SELECT 'ACTIVIDADES','EDITOR' UNION ALL
+  SELECT 'RUTINAS','AUDITOR'     UNION ALL SELECT 'RUTINAS','EDITOR'   UNION ALL
+  SELECT 'RECORDATORIOS','AUDITOR' UNION ALL SELECT 'RECORDATORIOS','EDITOR' UNION ALL
+  SELECT 'PROGRESO','AUDITOR'    UNION ALL SELECT 'PROGRESO','EDITOR' UNION ALL
+  SELECT 'GUIAS','AUDITOR'       UNION ALL SELECT 'GUIAS','EDITOR'
+) r;
+
+-- ===========================
+-- 2) Users (5k usuarios, 80 coaches)
+-- ===========================
+WITH
 first_names(name) AS (
   SELECT 'Ariana' UNION ALL SELECT 'Lucas' UNION ALL SELECT 'Maya' UNION ALL
   SELECT 'Santiago' UNION ALL SELECT 'Isabella' UNION ALL SELECT 'Diego' UNION ALL
@@ -76,172 +95,128 @@ last_names(name) AS (
 ),
 fn AS (SELECT name, ROW_NUMBER() OVER () rn, COUNT(*) OVER () tot FROM first_names),
 ln AS (SELECT name, ROW_NUMBER() OVER () rn, COUNT(*) OVER () tot FROM last_names)
+
+-- Coaches
+INSERT INTO users (username, email, password, coach_id)
 SELECT
-  LOWER(CONCAT(fn.name,'.',ln.name,'.',LPAD(u.seq,4,'0'))),
-  LOWER(CONCAT(fn.name,'.',ln.name,'.',LPAD(u.seq,4,'0'),'@fitflow.test')),
-  '$2a$12$kzhFS4BHdP3ACWv3lR2OHOVOsmVk2011LLefmm76eQ1ebJM0UNXfi',
+  LOWER(CONCAT(fn.name,'.',ln.name,LPAD(u.seq,3,'0'))) AS username,
+  LOWER(CONCAT(fn.name,'.',ln.name,LPAD(u.seq,3,'0'),'@fitflow.test')) AS email,
+  '$2a$12$kzhFS4BHdP3ACWv3lR2OHOVOsmVk2011LLefmm76eQ1ebJM0UNXfi', -- bcrypt fijo
   NULL
-FROM u
+FROM s_users u
 JOIN fn ON ((u.seq % fn.tot)+1)=fn.rn
 JOIN ln ON ((u.seq % ln.tot)+1)=ln.rn
-ORDER BY u.seq;
+WHERE u.seq <= @N_COACHES;
 
--- 2B) Resto de usuarios con coach asignado 1..@N_COACHES
+-- Restantes
 INSERT INTO users (username, email, password, coach_id)
-WITH RECURSIVE u(seq) AS (
-  SELECT @N_COACHES+1 UNION ALL SELECT seq+1 FROM u WHERE seq < @N_USERS
-),
-first_names(name) AS (
-  SELECT 'Ariana' UNION ALL SELECT 'Lucas' UNION ALL SELECT 'Maya' UNION ALL
-  SELECT 'Santiago' UNION ALL SELECT 'Isabella' UNION ALL SELECT 'Diego' UNION ALL
-  SELECT 'Renata' UNION ALL SELECT 'Marco' UNION ALL SELECT 'Emma' UNION ALL
-  SELECT 'Tomas' UNION ALL SELECT 'Zoe' UNION ALL SELECT 'Leo' UNION ALL
-  SELECT 'Abril' UNION ALL SELECT 'Javier' UNION ALL SELECT 'Elena' UNION ALL
-  SELECT 'Noa' UNION ALL SELECT 'Thiago' UNION ALL SELECT 'Ivanna' UNION ALL
-  SELECT 'Nicolas' UNION ALL SELECT 'Valeria'
-),
-last_names(name) AS (
-  SELECT 'Cascante' UNION ALL SELECT 'Salas' UNION ALL SELECT 'Espinoza' UNION ALL
-  SELECT 'Chaves' UNION ALL SELECT 'Calderon' UNION ALL SELECT 'Pizarro' UNION ALL
-  SELECT 'Alpizar' UNION ALL SELECT 'Solis' UNION ALL SELECT 'Leiva' UNION ALL
-  SELECT 'Carvajal' UNION ALL SELECT 'Chacon' UNION ALL SELECT 'Arrieta' UNION ALL
-  SELECT 'Sequeira' UNION ALL SELECT 'Mendez' UNION ALL SELECT 'Quiros' UNION ALL
-  SELECT 'Esquivel' UNION ALL SELECT 'Campos' UNION ALL SELECT 'Gamboa' UNION ALL
-  SELECT 'Jimenez' UNION ALL SELECT 'Ulate'
-),
-fn AS (SELECT name, ROW_NUMBER() OVER () rn, COUNT(*) OVER () tot FROM first_names),
-ln AS (SELECT name, ROW_NUMBER() OVER () rn, COUNT(*) OVER () tot FROM last_names)
 SELECT
-  LOWER(CONCAT(fn.name,'.',ln.name,'.',LPAD(u.seq,4,'0'))),
-  LOWER(CONCAT(fn.name,'.',ln.name,'.',LPAD(u.seq,4,'0'),'@fitflow.test')),
+  LOWER(CONCAT(fn.name,'.',ln.name,LPAD(u.seq,3,'0'))) AS username,
+  LOWER(CONCAT(fn.name,'.',ln.name,LPAD(u.seq,3,'0'),'@fitflow.test')) AS email,
   '$2a$12$kzhFS4BHdP3ACWv3lR2OHOVOsmVk2011LLefmm76eQ1ebJM0UNXfi',
-  1 + MOD(u.seq-1, @N_COACHES)
-FROM u
+  1+MOD(u.seq-1,@N_COACHES)
+FROM s_users u
 JOIN fn ON ((u.seq % fn.tot)+1)=fn.rn
 JOIN ln ON ((u.seq % ln.tot)+1)=ln.rn
-ORDER BY u.seq;
+WHERE u.seq > @N_COACHES;
 
--- 2C) user_roles (sin duplicar PK compuesta)
+-- Roles x usuario
 INSERT INTO user_roles (user_id, role_id)
 SELECT u.id, r.id
 FROM users u
-JOIN roles r
-WHERE MOD(u.id + r.id, 7) = 0;
+JOIN roles r ON MOD(u.id+r.id,2)=0;
 
--- 3) Habits
-INSERT INTO habits (name,category,description)
-WITH RECURSIVE h(seq) AS (
-  SELECT 1 UNION ALL SELECT seq+1 FROM h WHERE seq < @N_HABITS
-),
-acts(a) AS (SELECT 'Respirar' UNION ALL SELECT 'Caminar' UNION ALL SELECT 'Meditar' UNION ALL SELECT 'Hidratar'),
+-- ===========================
+-- 3) Habits + user_habit
+-- ===========================
+WITH acts(a) AS (SELECT 'Respirar' UNION ALL SELECT 'Caminar' UNION ALL SELECT 'Meditar' UNION ALL SELECT 'Hidratar'),
 adjs(a) AS (SELECT 'Vital' UNION ALL SELECT 'Ligero' UNION ALL SELECT 'Sereno' UNION ALL SELECT 'Enfocado'),
 cats(c) AS (SELECT 'PHYSICAL' UNION ALL SELECT 'MENTAL' UNION ALL SELECT 'SLEEP' UNION ALL SELECT 'DIET'),
 A AS (SELECT a,ROW_NUMBER() OVER() rn,COUNT(*) OVER() tot FROM acts),
 B AS (SELECT a,ROW_NUMBER() OVER() rn,COUNT(*) OVER() tot FROM adjs),
 C AS (SELECT c,ROW_NUMBER() OVER() rn,COUNT(*) OVER() tot FROM cats)
+
+INSERT INTO habits (name,category,description)
 SELECT CONCAT(b.a,' ',a.a,' ',LPAD(h.seq,3,'0')),
        c.c,
        CONCAT('Habito ',LOWER(b.a),' para ',LOWER(a.a))
-FROM h
+FROM s_habits h
 JOIN A a ON ((h.seq%a.tot)+1)=a.rn
 JOIN B b ON ((h.seq%b.tot)+1)=b.rn
-JOIN C c ON ((h.seq%c.tot)+1)=c.rn
-ORDER BY h.seq;
+JOIN C c ON ((h.seq%c.tot)+1)=c.rn;
 
--- 3B) user_habit: 3 por usuario
+-- favoritos
 INSERT INTO user_habit(user_id,habit_id)
-WITH slots AS (SELECT 1 AS slot UNION ALL SELECT 2 UNION ALL SELECT 3),
-h_rank AS (SELECT id AS habit_id, ROW_NUMBER() OVER (ORDER BY id) rn, COUNT(*) OVER() tot FROM habits)
-SELECT u.id,
-       h.habit_id
+SELECT u.id,h.id
 FROM users u
-CROSS JOIN slots s
-JOIN h_rank h ON h.rn = (((u.id-1)*@FAVS_PER_USER + s.slot - 1) % h.tot) + 1;
+JOIN habits h ON MOD(u.id+h.id,@FAVS_PER_USER)=0;
 
--- 4) Guides
+-- ===========================
+-- 4) Guides + recommended habits
+-- ===========================
 INSERT INTO guides(title,content,category)
-WITH RECURSIVE g(seq) AS (
-  SELECT 1 UNION ALL SELECT seq+1 FROM g WHERE seq < @N_GUIDES
-)
 SELECT CONCAT('Guia ',g.seq),
        CONCAT('Contenido guia ',g.seq),
        ELT(1+MOD(g.seq,4),'PHYSICAL','MENTAL','SLEEP','DIET')
-FROM g;
+FROM s_guides g;
 
--- guide_recommended_habit: 2 por guía
 INSERT INTO guide_recommended_habit(guide_id,habit_id)
-WITH g_rank AS (SELECT id AS guide_id, ROW_NUMBER() OVER (ORDER BY id) rn FROM guides),
-     h_rank AS (SELECT id AS habit_id, ROW_NUMBER() OVER (ORDER BY id) rn, COUNT(*) OVER() tot FROM habits),
-     picks AS (SELECT 1 AS slot UNION ALL SELECT 2)
-SELECT gr.guide_id, h.habit_id
-FROM g_rank gr
-CROSS JOIN picks p
-JOIN h_rank h ON h.rn = (((gr.guide_id-1)*2 + p.slot - 1) % h.tot) + 1;
+SELECT g.id,h.id
+FROM guides g
+JOIN habits h ON MOD(g.id+h.id,7)=0;
 
--- 5) Routines: 2 por usuario + bitmask días (varbinary)
+-- ===========================
+-- 5) Routines + activities
+-- ===========================
 INSERT INTO routines(user_id,title,days_of_week)
-WITH slots AS (SELECT 1 AS slot UNION ALL SELECT 2)
 SELECT u.id,
-       CONCAT(ELT(1 + MOD(u.id+slot,5),'Impulso','Balance','Foco','Recarga','Evolucion'),
-              ' ', ELT(1 + MOD(u.id+slot,4),'Activa','Serena','Dinamica','Integral'),
-              ' ', LPAD(slot,2,'0')),
-       UNHEX(LPAD(HEX(
-         (1 << (1 + MOD(u.id+slot,7))) |
-         (1 << (1 + MOD(u.id+slot+2,7))) |
-         (1 << (1 + MOD(u.id+slot+4,7)))
-       ), 2, '0'))
+       CONCAT('Rutina ',u.id),
+       x'7F'
 FROM users u
-JOIN slots;
+JOIN s2 s ON 1;
 
--- 5B) routine_activities: 3 por rutina
 INSERT INTO routine_activities(routine_id,habit_id,duration,notes)
-WITH slots AS (SELECT 1 AS slot UNION ALL SELECT 2 UNION ALL SELECT 3),
-h_rank AS (SELECT id AS habit_id, ROW_NUMBER() OVER (ORDER BY id) rn, COUNT(*) OVER() tot FROM habits)
-SELECT r.id,
-       h.habit_id,
-       12 + (s.slot * 6) + MOD(r.id,5)*2,
-       CONCAT('Nota act ',r.id,'-',h.habit_id,' | ref-', LPAD(CONV(UUID_SHORT(),10,32), 6, '0'))
+SELECT r.id,h.id,
+       15+MOD(r.id+h.id,30),
+       CONCAT('Nota act ',r.id,'-',h.id)
 FROM routines r
-JOIN slots s
-JOIN h_rank h ON h.rn = (((r.id-1)*@ACTIVITIES_PER_ROUTINE + s.slot - 1) % h.tot) + 1
-ORDER BY r.id, s.slot;
+JOIN s3 s ON 1
+JOIN habits h ON h.id<=@N_HABITS AND MOD(h.id+r.id+s.seq,@N_HABITS)=0;
 
--- 6) progress_log: 5 por rutina (columna log_date)
+-- ===========================
+-- 6) Progress logs
+-- ===========================
 INSERT INTO progress_log(user_id,routine_id,log_date)
-WITH slots AS (SELECT 1 AS slot UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5)
-SELECT r.user_id, r.id,
-       DATE_ADD('2024-11-01', INTERVAL (r.id*2 + s.slot*3) DAY)
+SELECT r.user_id,r.id,
+       DATE_ADD('2024-11-01',INTERVAL (r.id*2+seq*3) DAY)
 FROM routines r
-JOIN slots s
-ORDER BY r.id, s.slot;
+JOIN s5 seq ON 1;
 
--- 7) completed_activities: ~500k
+-- ===========================
+-- 7) Completed activities (~500k)
+-- ===========================
 INSERT INTO completed_activities(habit_id,progress_log_id,completed_at,notes)
-WITH RECURSIVE slots AS (
-  SELECT 1 AS slot
-  UNION ALL SELECT slot+1 FROM slots WHERE slot < @COMPLETED_PER_LOG
-),
-h_rank AS (SELECT id AS habit_id, ROW_NUMBER() OVER (ORDER BY id) rn, COUNT(*) OVER() tot FROM habits)
-SELECT
-  h.habit_id,
-  pl.id,
-  TIMESTAMPADD(MINUTE, 25*s.slot + MOD(pl.id, 13)*2, 
-    TIMESTAMP(DATE(pl.log_date), '06:05:00')),
-  CONCAT('Completado ',pl.id,'-',h.habit_id,'-',s.slot)
+SELECT h.id,pl.id,
+       TIMESTAMPADD(MINUTE,30*seq,pl.log_date),
+       CONCAT('Completado ',pl.id,'-',h.id,'-',seq)
 FROM progress_log pl
-JOIN slots s
-JOIN h_rank h ON h.rn = (((pl.id-1)*@COMPLETED_PER_LOG + s.slot - 1) % h.tot) + 1
-ORDER BY pl.id, s.slot;
+JOIN s10 seq ON 1
+JOIN habits h ON MOD(h.id+pl.id+seq,17)=0;
 
--- 8) reminder
+-- ===========================
+-- 8) Reminders
+-- ===========================
 INSERT INTO reminder(user_id,habit_id,frequency,message,time)
 SELECT u.id,h.id,
-       ELT(1 + MOD(u.id,2), 'DAILY','WEEKLY'),
+       'DAILY',
        CONCAT('Recordatorio de ',h.name),
-       TIMESTAMP(DATE('2024-11-05'),MAKETIME(7 + MOD(u.id,2), 30, 0))
+       TIMESTAMP(DATE('2024-11-05'),MAKETIME(7,30,0))
 FROM users u
 JOIN habits h ON h.id<=10
 WHERE u.id<=500;
 
-SET UNIQUE_CHECKS = 1;
+-- ===========================
+-- Commit
+-- ===========================
+SET UNIQUE_CHECKS=1;
 COMMIT;

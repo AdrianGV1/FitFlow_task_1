@@ -10,6 +10,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import jakarta.transaction.Transactional;
@@ -17,7 +18,6 @@ import una.ac.cr.FitFlow.model.Role;
 import una.ac.cr.FitFlow.model.User;
 import una.ac.cr.FitFlow.repository.RoleRepository;
 import una.ac.cr.FitFlow.repository.UserRepository;
-import una.ac.cr.FitFlow.security.PasswordHashService; // 🔹 Cambiado
 
 @Slf4j
 @Component
@@ -28,7 +28,7 @@ public class AdminSeeder implements CommandLineRunner {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
-    private final PasswordHashService passwordHashService; // 🔹 Cambiado
+    private final PasswordEncoder passwordEncoder;
 
     @Value("${app.seed.admin.email:admin@example.com}")
     private String adminEmail;
@@ -47,22 +47,13 @@ public class AdminSeeder implements CommandLineRunner {
             User u = new User();
             u.setUsername(adminUsername);      
             u.setEmail(adminEmail);
-            u.setPassword(passwordHashService.encode(adminPassword)); // 🔹 Cambiado
+            u.setPassword(passwordEncoder.encode(adminPassword));
             return userRepository.save(u);
         });
 
         boolean changed = false;
-        if (!adminUsername.equals(admin.getUsername())) { 
-            admin.setUsername(adminUsername); 
-            changed = true; 
-        }
-        
-        // 🔹 Solo actualizar password si realmente cambió
-        if (!passwordHashService.matches(adminPassword, admin.getPassword())) {
-            admin.setPassword(passwordHashService.encode(adminPassword)); // 🔹 Cambiado
-            changed = true;
-        }
-        
+        if (!adminUsername.equals(admin.getUsername())) { admin.setUsername(adminUsername); changed = true; }
+        admin.setPassword(passwordEncoder.encode(adminPassword)); changed = true;
         if (changed) admin = userRepository.save(admin);
 
         if (admin.getRoles() == null) {

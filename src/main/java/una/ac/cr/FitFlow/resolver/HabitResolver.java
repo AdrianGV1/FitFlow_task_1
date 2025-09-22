@@ -113,4 +113,6 @@ public class HabitResolver {
         // necesitarías un método en GuideService → findByHabitId
         return guideService.findByHabitId(habit.getId());
     }
+
+    
 }

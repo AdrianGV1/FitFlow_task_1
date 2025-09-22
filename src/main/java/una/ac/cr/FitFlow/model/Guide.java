@@ -15,7 +15,7 @@ import java.util.*;
 public class Guide {
 
     public enum Category {
-
+        PHYSICAL, MENTAL, SLEEP, DIET
     }
 
     @Id

@@ -14,6 +14,10 @@ import java.util.*;
 @ToString(onlyExplicitlyIncluded = true)
 public class Routine {
 
+    public static enum DaysOfWeek {
+    MON, TUE, WED, THU, FRI, SAT, SUN
+}
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -26,7 +30,7 @@ public class Routine {
     private User user;
 
     @Column(name = "days_of_week", nullable = false)
-    private String daysOfWeek;
+    private List<DaysOfWeek> daysOfWeek;
 
     @OneToMany(mappedBy = "routine", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

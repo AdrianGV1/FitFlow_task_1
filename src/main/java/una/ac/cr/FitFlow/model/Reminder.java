@@ -2,7 +2,7 @@ package una.ac.cr.FitFlow.model;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.time.LocalTime;
+import java.time.OffsetDateTime;
 
 @Entity
 @Table(name = "reminder")
@@ -29,8 +29,11 @@ public class Reminder {
     @JoinColumn(name = "habit_id", nullable = false)
     private Habit habit;
 
+    @Column(nullable = false, length = 255)
+    private String message;
+
     @Column(nullable = false)
-    private LocalTime time;
+    private OffsetDateTime time;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)

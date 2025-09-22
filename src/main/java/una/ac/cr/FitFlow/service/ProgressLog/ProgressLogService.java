@@ -1,26 +1,20 @@
+// ProgressLogService.java
 package una.ac.cr.FitFlow.service.ProgressLog;
-
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import una.ac.cr.FitFlow.dto.ProgressLog.ProgressLogInputDTO;
+import una.ac.cr.FitFlow.dto.ProgressLog.ProgressLogOutputDTO;
 
-import una.ac.cr.FitFlow.dto.ProgressLogDTO;
+import java.time.OffsetDateTime;
+import java.util.List;
 
 public interface ProgressLogService {
-    ProgressLogDTO create(ProgressLogDTO dto);
-
-    ProgressLogDTO update(Long id, ProgressLogDTO dto);
-
-    void delete(Long id);
-
-    ProgressLogDTO findById(Long id);
-
-    Page<ProgressLogDTO> list(Pageable pageable);
-
-    Page<ProgressLogDTO> listByUserId(Long userId, Pageable pageable);
-
-    List<ProgressLogDTO> findByUserIdAndDate(Long userId, LocalDate date);
+  ProgressLogOutputDTO create(ProgressLogInputDTO in);
+  ProgressLogOutputDTO update(Long id, ProgressLogInputDTO in);
+  void delete(Long id);
+  ProgressLogOutputDTO findById(Long id);
+  Page<ProgressLogOutputDTO> list(Pageable pageable);
+  Page<ProgressLogOutputDTO> listByUser(Long userId, Pageable pageable);
+  List<ProgressLogOutputDTO> listByUserOnDate(Long userId, OffsetDateTime dateAtUserZone);
 }

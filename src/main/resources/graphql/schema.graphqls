@@ -1,0 +1,385 @@
+scalar Long
+scalar DateTime
+
+enum GuideCategory { PHYSICAL, MENTAL, SLEEP, DIET }
+enum HabitCategory { PHYSICAL, MENTAL, SLEEP, DIET }
+enum Frequency { DAILY, WEEKLY }
+enum Permissions {EDITOR, AUDITOR}
+enum Module { RUTINAS, ACTIVIDADES, GUIAS, PROGRESO, RECORDATORIOS }
+enum DaysOfWeek { MON, TUE, WED, THU, FRI, SAT, SUN }
+
+type Query {
+  studentsOfCoach(coachId: ID!, page: Int!, size: Int!): UserPage!
+  completedActivityById(id: ID!): CompletedActivity
+  completedActivities(page: Int!, size: Int!, keyword: String): CompletedActivityPage!
+  completedActivitiesByUserId(page: Int!, size: Int!, userId: ID!): CompletedActivityPage!
+  completedActivitiesByProgressLogId(page: Int!, size: Int!, progressLogId: ID!): CompletedActivityPage!
+  guideById(id: ID!): Guide
+  guides(page: Int!, size: Int!, keyword: String!): GuidePage!
+  habitById(id: ID!): Habit
+  habits(page: Int!, size: Int!, keyword: String): HabitPage!
+  reminderById(id: ID!): Reminder
+  reminders(page: Int!, size: Int!): ReminderPage!
+  remindersByUserId(userId: ID!, page: Int!, size: Int!): ReminderPage!
+  roleById(id: ID!): Role
+  roles(page: Int!, size: Int!): RolePage!
+  routineActivityById(id: ID!): RoutineActivity
+  routineActivities(page: Int!, size: Int!): RoutineActivityPage!
+  routineActivitiesByRoutineId(routineId: ID!, page: Int!, size: Int!): RoutineActivityPage!
+  routineActivitiesByHabitId(habitId: ID!, page: Int!, size: Int!): RoutineActivityPage!
+  routineById(id: ID!): Routine
+  routines(page: Int!, size: Int!, keyword: String): RoutinePage!
+  userById(id: ID!): User
+  users(page: Int!, size: Int!, keyword: String): UserPage!
+  progressLogById(id: ID!): ProgressLog
+  progressLogs(page: Int!, size: Int!): ProgressLogPage!
+  progressLogsByUser(userId: ID!, page: Int!, size: Int!): ProgressLogPage!
+  createDailyProgress(userId: ID!, date: DateTime!, completedCount: Int!): DailyProgressSummary!
+  updateDailyProgress(userId: ID!, date: DateTime!, completedCount: Int!): DailyProgressSummary!
+  deleteDailyProgress(userId: ID!, date: DateTime!): Boolean!
+  routineWeeklyProgress(routineId: ID!, userId: ID!, refDate: DateTime): RoutineWeeklyProgress!
+  dailyProgressByUser(userId: ID!, date: DateTime!): DailyProgressSummary!
+  monthlyCompletedActivitiesByCategoryAndDate(category: HabitCategory!date: DateTime!): [CompletedActivity!]!
+}
+
+type Mutation {
+  createCompletedActivity(input: CompletedActivityCreateInput!): CompletedActivity!
+  updateCompletedActivity(id: ID!, input: CompletedActivityUpdateInput!): CompletedActivity!
+  deleteCompletedActivity(id: ID!): Boolean!
+  createGuide(input: GuideCreateInput!): Guide!
+  updateGuide(id: ID!, input: GuideUpdateInput!): Guide!
+  deleteGuide(id: ID!): Boolean!
+  createHabit(input: HabitCreateInput!): Habit!
+  updateHabit(id: ID!, input: HabitUpdateInput!): Habit!
+  deleteHabit(id: ID!): Boolean!
+  createReminder(input: ReminderCreateInput!): Reminder!
+  updateReminder(id: ID!, input: ReminderUpdateInput!): Reminder!
+  deleteReminder(id: ID!): Boolean!
+  createRole(input: RoleInput!): Role!
+  updateRole(input: RoleInput!): Role!
+  deleteRole(id: ID!): Boolean!
+  createRoutineActivity(input: RoutineActivityCreateInput!): RoutineActivity!
+  updateRoutineActivity(id: ID!, input: RoutineActivityUpdateInput!): RoutineActivity!
+  deleteRoutineActivity(id: ID!): Boolean!
+  createRoutine(input: RoutineCreateInput!): Routine!
+  updateRoutine(id: ID!, input: RoutineUpdateInput!): Routine!
+  deleteRoutine(id: ID!): Boolean!
+  createUser(input: UserCreateInput!): User!
+  updateUser(id: ID!, input: UserUpdateInput!): User!
+  deleteUser(id: ID!): Boolean!
+  login(email: String!, password: String!): LoginToken!
+  createProgressLog(input: ProgressLogCreateInput!): ProgressLog!
+  updateProgressLog(id: ID!, input: ProgressLogUpdateInput!): ProgressLog!
+  deleteProgressLog(id: ID!): Boolean!
+  createDailyProgress(userId: ID!, date: DateTime!, completedCount: Int!): DailyProgressSummary!
+  updateDailyProgress(userId: ID!, date: DateTime!, completedCount: Int!): DailyProgressSummary!
+  deleteDailyProgress(userId: ID!, date: DateTime!): Boolean!
+  assignUserToCoach(coachId: ID!, userId: ID!): User!
+}
+
+type MonthlyProgressByCategory {
+  year: Int!
+  month: Int!
+  category: HabitCategory!
+  total: Long!
+}
+
+type WeeklyProgressPoint {
+  date: String!
+  logs: Int!
+  completedActivities: Int!
+}
+
+type RoutineWeeklyProgress {
+  routineId: ID!
+  userId: ID!
+  weekStart: String!
+  weekEnd: String!
+  points: [WeeklyProgressPoint!]!
+  totalLogs: Int!
+  totalCompletedActivities: Int!
+}
+
+type DailyProgressSummary {
+  userId: ID!
+  date: DateTime!
+  completedCount: Int!
+}
+
+type LoginToken {
+  token: String!
+  expiresAt: DateTime!
+  userId: ID!
+}
+
+type CompletedActivity {
+  id: ID!
+  habit: Habit!
+  user: User!
+  completedAt: DateTime!
+  notes: String
+}
+
+input CompletedActivityCreateInput {
+  habitId: ID!
+  progressLogId: ID!
+  completedAt: DateTime!
+  notes: String
+}
+
+input CompletedActivityUpdateInput {
+  habitId: ID
+  progressLogId: ID
+  completedAt: DateTime
+  notes: String
+}
+
+type CompletedActivityPage {
+  content: [CompletedActivity!]!
+  totalElements: Int!
+  totalPages: Int!
+  pageNumber: Int!
+  pageSize: Int!
+}
+
+type Guide {
+  id: ID!
+  title: String!
+  content: String!
+  category: GuideCategory
+  recommendedHabits: [Habit!]!
+}
+
+input GuideCreateInput {
+  title: String!
+  content: String!
+  category: GuideCategory!
+}
+
+input GuideUpdateInput {
+  title: String!
+  content: String!
+  category: GuideCategory!
+}
+
+type GuidePage {
+  content: [Guide]!
+  totalElements: Int!
+  totalPage: Int!
+  pageNumber: Int!
+  pageSize: Int!
+}
+
+type Habit {
+  id: ID!
+  name: String!
+  category: HabitCategory!
+  description: String
+  users: [User!]
+  routineActivities: [RoutineActivity!]
+  completedActivities: [CompletedActivity!]
+  reminders: [Reminder!]
+  guides: [Guide!]
+}
+
+input HabitCreateInput {
+  name: String!
+  category: HabitCategory!
+  description: String
+}
+
+input HabitUpdateInput {
+  name: String
+  category: HabitCategory
+  description: String
+}
+
+type HabitPage {
+  content: [Habit!]!
+  totalElements: Int!
+  totalPages: Int!
+  pageNumber: Int!
+  pageSize: Int!
+}
+
+type Reminder {
+  id: ID!
+  message: String!
+  time: DateTime!
+  frequency: Frequency!
+  user: User!
+  habit: Habit
+}
+
+input ReminderCreateInput {
+  message: String!
+  time: DateTime!
+  frequency: Frequency!
+  userId: ID!
+  habitId: ID
+}
+
+input ReminderUpdateInput {
+  message: String
+  time: DateTime
+  frequency: Frequency
+  userId: ID
+  habitId: ID
+}
+
+type ReminderPage {
+  content: [Reminder!]!
+  totalElements: Int!
+  totalPages: Int!
+  pageNumber: Int!
+  pageSize: Int!
+}
+
+type Role {
+  name: String!
+  permissions: Permissions!   
+  module: Module!             
+}
+
+input RoleInput {
+  name: String!
+  permissions: Permissions!    
+  module: Module!              
+}
+
+
+type RolePage {
+  content: [Role!]!
+  totalElements: Int!
+  totalPages: Int!
+  pageNumber: Int!
+  pageSize: Int!
+}
+
+type RoutineActivity {
+  id: ID!
+  routine: Routine!
+  habit: Habit!
+  duration: Int!
+  notes: String
+}
+
+input RoutineActivityCreateInput {
+  routineId: ID!
+  habitId: ID!
+   duration: Int!
+  notes: String
+}
+
+input RoutineActivityUpdateInput {
+  routineId: ID
+  habitId: ID
+   duration: Int!
+  notes: String
+}
+
+type RoutineActivityPage {
+  content: [RoutineActivity!]!
+  totalElements: Int!
+  totalPages: Int!
+  pageNumber: Int!
+  pageSize: Int!
+}
+
+type Routine {
+  id: ID!
+  title: String!
+  userId: ID!
+  daysOfWeek: [DaysOfWeek!]!
+  activityIds: [ID!]
+  user: User!
+  activities: [RoutineActivity!]!
+}
+
+input RoutineCreateInput {
+  title: String!
+  userId: ID!
+  daysOfWeek: [DaysOfWeek!]!
+  activityIds: [ID!]
+}
+
+input RoutineUpdateInput {
+  name: String
+  userId: ID
+  daysOfWeek: [DaysOfWeek!]
+}
+
+type RoutinePage {
+  content: [Routine!]!
+  totalElements: Int!
+  totalPages: Int!
+  pageNumber: Int!
+  pageSize: Int!
+}
+
+type User {
+  id: ID!
+  username: String!
+  email: String!
+  roles: [Role!]!
+  habits: [Habit!]!
+}
+
+input UserCreateInput {
+  username: String!
+  password: String!
+  email: String!
+  roleIds: [ID!]!
+  habitIds: [ID!]
+}
+
+input UserUpdateInput {
+  username: String
+  password: String
+  email: String
+  roleIds: [ID!]
+  habitIds: [ID!]
+}
+
+type UserPage {
+  content: [User!]!
+  totalElements: Int!
+  totalPages: Int!
+  pageNumber: Int!
+  pageSize: Int!
+}
+
+
+type ProgressLog {
+  id: ID!
+  date: DateTime!                 
+  user: User!
+  routine: Routine!
+  completedActivities: [CompletedActivity!]!
+}
+
+input ProgressLogCreateInput {
+  date: DateTime!                 
+  userId: ID!
+  routineId: ID!
+}
+
+input ProgressLogUpdateInput {
+  date: DateTime
+  userId: ID
+  routineId: ID
+}
+
+type ProgressLogPage {
+  content: [ProgressLog!]!
+  totalElements: Int!
+  totalPages: Int!
+  pageNumber: Int!
+  pageSize: Int!
+}
+
+
+schema {
+  query: Query
+  mutation: Mutation
+}

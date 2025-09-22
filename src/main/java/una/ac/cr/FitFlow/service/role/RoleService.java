@@ -2,17 +2,13 @@ package una.ac.cr.FitFlow.service.role;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-
-import una.ac.cr.FitFlow.dto.RoleDTO;
+import una.ac.cr.FitFlow.dto.Role.RoleInputDTO;
+import una.ac.cr.FitFlow.dto.Role.RoleOutputDTO;
 
 public interface RoleService {
-    RoleDTO create(RoleDTO role);
-
-    RoleDTO update(Long id, RoleDTO role);
-
+    RoleOutputDTO create(RoleInputDTO role);
+    RoleOutputDTO update(RoleInputDTO role);
     void delete(Long id);
-
-    RoleDTO findById(Long id);
-
-    Page<RoleDTO> listRoles(Pageable pageable);
+    RoleOutputDTO findById(Long id);
+    Page<RoleOutputDTO> listRoles(Pageable pageable);
 }

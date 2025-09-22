@@ -1,14 +1,13 @@
 package una.ac.cr.FitFlow.service.role;
 
-import java.util.Set;
-
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import lombok.RequiredArgsConstructor;
-import una.ac.cr.FitFlow.dto.RoleDTO;
+import una.ac.cr.FitFlow.dto.Role.RoleInputDTO;
+import una.ac.cr.FitFlow.dto.Role.RoleOutputDTO;
+import una.ac.cr.FitFlow.mapper.MapperForRole;
 import una.ac.cr.FitFlow.model.Role;
 import una.ac.cr.FitFlow.repository.RoleRepository;
 
@@ -18,106 +17,69 @@ import una.ac.cr.FitFlow.repository.RoleRepository;
 public class RoleServiceImplementation implements RoleService {
 
     private final RoleRepository roleRepository;
+    private final MapperForRole mapper;
 
-    private RoleDTO convertToDto(Role role) {
-        return RoleDTO.builder()
+    private String deriveName(Role.Module module, Role.Permission permission) {
+        return module.name() + "_" + permission.name();
+    }
+
+    private RoleOutputDTO toDto(Role role) {
+        return RoleOutputDTO.builder()
                 .id(role.getId())
-                .name(role.getModule().toString())
-                .permissions(Set.of(role.getPermission().name()))
+                .name(deriveName(role.getModule(), role.getPermission()))
+                .permissions(role.getPermission())
+                .module(role.getModule())
                 .build();
-    }
-
-    private Role convertToEntity(final RoleDTO roleDto) {
-        Role.Module module = parseModule(roleDto.getName());
-        Role.Permission permission = parsePermission(singlePermissionFromDto(roleDto));
-        return Role.builder()
-                .module(module)
-                .permission(permission)
-                .build();
-    }
-
-    private Role.Module parseModule(String module) {
-        if (module == null)
-            throw new IllegalArgumentException("El nombre es obligatorio");
-        try {
-            return Role.Module.valueOf(module.trim().toUpperCase());
-        } catch (IllegalArgumentException ex) {
-            throw new IllegalArgumentException("Módulo inválido: " + module);
-        }
-    }
-
-    private Role.Permission parsePermission(String permission) {
-        if (permission == null)
-            throw new IllegalArgumentException("El permiso es obligatorio");
-        try {
-            return Role.Permission.valueOf(permission.trim().toUpperCase());
-        } catch (IllegalArgumentException ex) {
-            throw new IllegalArgumentException("Permiso inválido: " + permission);
-        }
-    }
-
-    private String singlePermissionFromDto(RoleDTO dto) {
-        if (dto.getPermissions() == null || dto.getPermissions().isEmpty()) {
-            throw new IllegalArgumentException("Debe especificar exactamente un permiso");
-        }
-        if (dto.getPermissions().size() > 1) {
-            throw new IllegalArgumentException("Solo se admite un permiso por role");
-        }
-        return dto.getPermissions().iterator().next();
     }
 
     @Override
     @Transactional
-    public RoleDTO create(RoleDTO roleDTO) {
-        Role roleEntity = convertToEntity(roleDTO);
-        boolean existModule = !roleRepository.findByModule(roleEntity.getModule()).isEmpty();
-        if (existModule) {
-            throw new IllegalArgumentException("El modulo ya existe");
+    public RoleOutputDTO create(RoleInputDTO dto) {
+        if (roleRepository.existsByModuleAndPermission(dto.getModule(), dto.getPermissions())) {
+            throw new IllegalArgumentException("Ya existe un role con ese (module, permission).");
         }
-        roleRepository.save(roleEntity);
-        return convertToDto(roleEntity);
+        Role saved = roleRepository.save(mapper.toEntity(dto));
+        return toDto(saved);
     }
 
     @Override
     @Transactional
-    public RoleDTO update(Long id, RoleDTO role) {
-        Role existingRole = roleRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Role no encontrado"));
-        if (!existingRole.getModule().equals(Role.Module.valueOf(role.getName()))) {
-            existingRole.setModule(Role.Module.valueOf(role.getName()));
-            existingRole.setPermission(Role.Permission.valueOf(role.getPermissions().iterator().next()));
-            roleRepository.save(existingRole);
-            return convertToDto(existingRole);
-        } else {
-            throw new IllegalArgumentException("El modulo ya existe");
+    public RoleOutputDTO update(RoleInputDTO dto) {
+        if (dto.getId() == null) {
+            throw new IllegalArgumentException("El id es obligatorio para actualizar.");
         }
+        Role role = roleRepository.findById(dto.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Role no encontrado: id=" + dto.getId()));
+
+        Role.Module targetModule = dto.getModule() != null ? dto.getModule() : role.getModule();
+        Role.Permission targetPerm = dto.getPermissions() != null ? dto.getPermissions() : role.getPermission();
+
+        if (roleRepository.existsByModuleAndPermissionAndIdNot(targetModule, targetPerm, role.getId())) {
+            throw new IllegalArgumentException("Otro role ya usa ese (module, permission).");
+        }
+
+        role.setModule(targetModule);
+        role.setPermission(targetPerm);
+        return toDto(roleRepository.save(role));
     }
 
     @Override
     @Transactional
     public void delete(Long id) {
-        if (roleRepository.existsById(id)) {
-            roleRepository.deleteById(id);
-        } else {
-            throw new IllegalArgumentException("El role con el id: " + id + " no existe");
-        }
+        Role role = roleRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("El role con id=" + id + " no existe."));
+        roleRepository.delete(role);
     }
 
     @Override
-    public RoleDTO findById(Long id) {
-        if (roleRepository.existsById(id)) {
-            Role role = roleRepository.findById(id)
-                    .orElseThrow(() -> new IllegalArgumentException("Role no encontrado"));
-            return convertToDto(role);
-        } else {
-            throw new IllegalArgumentException("El role con el id: " + id + " no existe");
-        }
+    public RoleOutputDTO findById(Long id) {
+        Role role = roleRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Role no encontrado: id=" + id));
+        return toDto(role);
     }
 
     @Override
-    public Page<RoleDTO> listRoles(Pageable pageable) {
-        Page<Role> roles = roleRepository.findAll(pageable);
-        return roles.map(this::convertToDto);
+    public Page<RoleOutputDTO> listRoles(Pageable pageable) {
+        return roleRepository.findAll(pageable).map(this::toDto);
     }
-
 }

@@ -1,22 +1,24 @@
 package una.ac.cr.FitFlow.service.CompletedActivity;
 
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Map;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-
-import una.ac.cr.FitFlow.dto.CompletedActivityDTO;
+import una.ac.cr.FitFlow.dto.CompletedActivity.CompletedActivityInputDTO;
+import una.ac.cr.FitFlow.dto.CompletedActivity.CompletedActivityOutputDTO;
 
 public interface CompletedActivityService {
-    CompletedActivityDTO createCompletedActivity(CompletedActivityDTO completedActivityDTO);
-
-    CompletedActivityDTO updateCompletedActivity(Long id, CompletedActivityDTO completedActivityDTO);
-
+    CompletedActivityOutputDTO createCompletedActivity(CompletedActivityInputDTO input);
+    CompletedActivityOutputDTO updateCompletedActivity(Long id, CompletedActivityInputDTO input);
     void deleteCompletedActivity(Long id);
+    CompletedActivityOutputDTO findCompletedActivityById(Long id);
+    Page<CompletedActivityOutputDTO> listCompletedActivities(String q, Pageable pageable);
+    Page<CompletedActivityOutputDTO> findCompletedActivitiesByUserId(Long userId, Pageable pageable);
+    Page<CompletedActivityOutputDTO> findByProgressLogId(Long progressLogId, Pageable pageable);
 
-    CompletedActivityDTO findCompletedActivityById(Long id);
+    List<CompletedActivityOutputDTO> monthlyCompletedActivitiesByCategoryAndDate(String category, OffsetDateTime date);
+    List<CompletedActivityOutputDTO> findByHabitId(Long habitId);
 
-    Page<CompletedActivityDTO> listCompletedActivities(String q, Pageable pageable);
-
-    Page<CompletedActivityDTO> findCompletedActivitiesByUserId(Long userId, Pageable pageable);
-
-    Page<CompletedActivityDTO> findByProgressLogId(Long progressLogId, Pageable pageable);
 }

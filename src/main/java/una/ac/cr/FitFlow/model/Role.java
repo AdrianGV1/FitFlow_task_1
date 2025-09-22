@@ -30,10 +30,12 @@ public class Role {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @EqualsAndHashCode.Include
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Module module;
 
+    @EqualsAndHashCode.Include
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Permission permission;

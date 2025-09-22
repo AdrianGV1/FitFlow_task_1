@@ -5,14 +5,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.PageImpl;
 
-import java.time.LocalTime;
-import java.util.Objects;
-
-import una.ac.cr.FitFlow.dto.ReminderDTO;
+import una.ac.cr.FitFlow.dto.Reminder.ReminderInputDTO;
+import una.ac.cr.FitFlow.dto.Reminder.ReminderOutputDTO;
+import una.ac.cr.FitFlow.mapper.MapperForReminder;
 import una.ac.cr.FitFlow.model.Reminder;
-import una.ac.cr.FitFlow.model.Reminder.Frequency;
 import una.ac.cr.FitFlow.model.User;
 import una.ac.cr.FitFlow.model.Habit;
 import una.ac.cr.FitFlow.repository.ReminderRepository;
@@ -23,86 +20,72 @@ import una.ac.cr.FitFlow.repository.HabitRepository;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ReminderServiceImplementation implements ReminderService {
+
     private final ReminderRepository reminderRepository;
     private final UserRepository userRepository;
     private final HabitRepository habitRepository;
+    private final MapperForReminder mapper;
 
-    private Frequency parseFrequency(String freq) {
-        if (freq == null) {
-            throw new IllegalArgumentException("Frecuencia requerida. Use DAILY o WEEKLY.");
-        }
+    private Reminder.Frequency parseFrequency(String raw) {
+        if (raw == null) return null;
         try {
-            return Frequency.valueOf(freq.toUpperCase().trim());
+            return Reminder.Frequency.valueOf(raw.trim().toUpperCase());
         } catch (Exception e) {
             throw new IllegalArgumentException("Frecuencia inválida. Use DAILY o WEEKLY.");
         }
     }
 
-    private ReminderDTO convertToDto(Reminder reminder) {
-        return ReminderDTO.builder()
-                .id(reminder.getId())
-                .userId(reminder.getUser() != null ? reminder.getUser().getId() : null)
-                .habitId(reminder.getHabit() != null ? reminder.getHabit().getId() : null)
-                .time(reminder.getTime() != null ? reminder.getTime().atDate(java.time.LocalDate.now()) : null)
-                .frequency(reminder.getFrequency() != null ? reminder.getFrequency().name() : null)
-                .build();
-    }
+    private ReminderOutputDTO toDto(Reminder r) { return mapper.toDto(r); }
 
-    private Reminder toEntityForCreate(ReminderDTO d) {
-        User user = userRepository.findById(d.getUserId())
-                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado: " + d.getUserId()));
-        Habit habit = habitRepository.findById(d.getHabitId())
-                .orElseThrow(() -> new IllegalArgumentException("Hábito no encontrado: " + d.getHabitId()));
-
-        if (d.getTime() == null) {
-            throw new IllegalArgumentException("El campo 'time' es requerido");
-        }
-
-        return Reminder.builder()
-                .user(user)
-                .habit(habit)
-                .time(d.getTime().toLocalTime())
-                .frequency(parseFrequency(d.getFrequency()))
-                .build();
-    }
-
-    private void applyForUpdate(Reminder target, ReminderDTO d) {
-        if (d.getUserId() != null &&
-                (target.getUser() == null || !Objects.equals(target.getUser().getId(), d.getUserId()))) {
-            User user = userRepository.findById(d.getUserId())
-                    .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado: " + d.getUserId()));
-            target.setUser(user);
-        }
-        if (d.getHabitId() != null &&
-                (target.getHabit() == null || !Objects.equals(target.getHabit().getId(), d.getHabitId()))) {
-            Habit habit = habitRepository.findById(d.getHabitId())
-                    .orElseThrow(() -> new IllegalArgumentException("Hábito no encontrado: " + d.getHabitId()));
-            target.setHabit(habit);
-        }
-        if (d.getTime() != null) {
-            LocalTime lt = d.getTime().toLocalTime();
-            target.setTime(lt);
-        }
-        if (d.getFrequency() != null) {
-            target.setFrequency(parseFrequency(d.getFrequency()));
-        }
-    }
-
- 
     @Override
     @Transactional
-    public ReminderDTO create(ReminderDTO dto) {
-        Reminder saved = reminderRepository.save(toEntityForCreate(dto));
-        return convertToDto(saved);
+    public ReminderOutputDTO create(ReminderInputDTO dto) {
+        if (dto.getUserId() == null)  throw new IllegalArgumentException("userId es obligatorio.");
+        if (dto.getHabitId() == null) throw new IllegalArgumentException("habitId es obligatorio.");
+        if (dto.getMessage() == null || dto.getMessage().trim().isEmpty())
+            throw new IllegalArgumentException("message es obligatorio.");
+        if (dto.getTime() == null)    throw new IllegalArgumentException("time es obligatorio.");
+        if (dto.getFrequency() == null || dto.getFrequency().trim().isEmpty())
+            throw new IllegalArgumentException("frequency es obligatorio.");
+
+        User user = userRepository.findById(dto.getUserId())
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado: " + dto.getUserId()));
+        Habit habit = habitRepository.findById(dto.getHabitId())
+                .orElseThrow(() -> new IllegalArgumentException("Hábito no encontrado: " + dto.getHabitId()));
+        Reminder.Frequency freq = parseFrequency(dto.getFrequency());
+
+        Reminder saved = reminderRepository.save(mapper.toEntity(dto, user, habit, freq));
+        return toDto(saved);
     }
 
     @Override
     @Transactional
-    public ReminderDTO update(Long id, ReminderDTO dto) {
+    public ReminderOutputDTO update(Long id, ReminderInputDTO dto) {
         Reminder current = reminderRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Recordatorio no encontrado: " + id));
-        applyForUpdate(current, dto);
-        return convertToDto(reminderRepository.save(current));
+
+        User userIfChanged = null;
+        if (dto.getUserId() != null &&
+                (current.getUser() == null || !dto.getUserId().equals(current.getUser().getId()))) {
+            userIfChanged = userRepository.findById(dto.getUserId())
+                    .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado: " + dto.getUserId()));
+        }
+
+        Habit habitIfChanged = null;
+        if (dto.getHabitId() != null &&
+                (current.getHabit() == null || !dto.getHabitId().equals(current.getHabit().getId()))) {
+            habitIfChanged = habitRepository.findById(dto.getHabitId())
+                    .orElseThrow(() -> new IllegalArgumentException("Hábito no encontrado: " + dto.getHabitId()));
+        }
+
+        Reminder.Frequency freqIfChanged = (dto.getFrequency() != null)
+                ? parseFrequency(dto.getFrequency())
+                : null;
+
+        mapper.copyToEntity(dto, current, userIfChanged, habitIfChanged, freqIfChanged);
+
+        Reminder saved = reminderRepository.save(current);
+        return toDto(saved);
     }
 
     @Override
@@ -115,26 +98,25 @@ public class ReminderServiceImplementation implements ReminderService {
     }
 
     @Override
-    public ReminderDTO findById(Long id) {
+    public ReminderOutputDTO findById(Long id) {
         return reminderRepository.findById(id)
-                .map(this::convertToDto)
+                .map(this::toDto)
                 .orElseThrow(() -> new IllegalArgumentException("Recordatorio no encontrado: " + id));
     }
 
     @Override
-    public Page<ReminderDTO> list(Pageable pageable) {
-        return reminderRepository.findAll(pageable).map(this::convertToDto);
+    public Page<ReminderOutputDTO> list(Pageable pageable) {
+        return reminderRepository.findAll(pageable).map(this::toDto);
     }
 
     @Override
-    public Page<ReminderDTO> listByUserId(Long userId, Pageable pageable) {
-        try {
-            return reminderRepository.findByUserId(userId, pageable).map(this::convertToDto);
-        } catch (NoSuchMethodError | org.springframework.dao.InvalidDataAccessApiUsageException e) {
-            var list = reminderRepository.findByUserId(userId).stream()
-                    .map(this::convertToDto)
-                    .toList();
-            return new PageImpl<>(list, pageable, list.size());
-        }
+    public Page<ReminderOutputDTO> listByUserId(Long userId, Pageable pageable) {
+        return reminderRepository.findByUser_Id(userId, pageable).map(this::toDto);
     }
+    @Override
+    public Page<ReminderOutputDTO> listByHabitId(Long habitId, Pageable pageable) {
+    return reminderRepository.findByHabit_Id(habitId, pageable)
+            .map(this::toDto);
+}
+
 }

@@ -4,16 +4,27 @@ import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.Key;
+import java.util.Base64;
 import java.util.Date;
 import java.util.Set;
 
 @Service
 public class JwtService {
-    private final String secret;
+    private static final String DEFAULT_SECRET_BASE64 = "9kkZxBS2H4F3s4xPomzPeJICq61NP1BXicImDxloBdallDph84ggdZmopTOa9uSQ3w8lhpjAPa7pb/Sb8llEVA==";
+
     private final long validityMillis;
+    private final Key signingKey;
+    private final JwtParser jwtParser;
 
     public JwtService() {
-        this.secret = System.getenv().getOrDefault("JWT_SECRET", "changeme");
+        String rawSecret = System.getenv().getOrDefault("JWT_SECRET", DEFAULT_SECRET_BASE64);
+        byte[] secretBytes = decodeSecret(rawSecret);
+        this.signingKey = Keys.hmacShaKeyFor(secretBytes);
+        this.jwtParser = Jwts.parserBuilder()
+            .setSigningKey(this.signingKey)
+            .build();
         String expStr = System.getenv("JWT_ACCESS_EXPIRATION");
         long exp = (expStr != null && !expStr.isBlank()) ? Long.parseLong(expStr) : 900;
         this.validityMillis = exp * 1000;
@@ -27,34 +38,25 @@ public class JwtService {
             .claim("roles", roles)
             .setIssuedAt(now)
             .setExpiration(exp)
-            .signWith(Keys.hmacShaKeyFor(secret.getBytes()), SignatureAlgorithm.HS512)
+            .signWith(signingKey, SignatureAlgorithm.HS512)
             .compact();
     }
 
     public String getUserNameFromToken(String token){
-        return Jwts.parserBuilder()
-            .setSigningKey(Keys.hmacShaKeyFor(secret.getBytes()))
-            .build()
-            .parseClaimsJws(token)
+        return jwtParser.parseClaimsJws(token)
             .getBody()
             .getSubject();
     }
 
     public String getEmailFromToken(String token){
-        return Jwts.parserBuilder()
-            .setSigningKey(Keys.hmacShaKeyFor(secret.getBytes()))
-            .build()
-            .parseClaimsJws(token)
+        return jwtParser.parseClaimsJws(token)
             .getBody()
             .getSubject();
     }
 
     @SuppressWarnings("unchecked")
     public Set<String> getRolesFromToken(String token) {
-        Object rolesObj = Jwts.parserBuilder()
-            .setSigningKey(Keys.hmacShaKeyFor(secret.getBytes()))
-            .build()
-            .parseClaimsJws(token)
+        Object rolesObj = jwtParser.parseClaimsJws(token)
             .getBody()
             .get("roles");
         if (rolesObj instanceof java.util.Collection<?>) {
@@ -67,10 +69,7 @@ public class JwtService {
 
     public boolean validate(String token){
         try {
-            Jwts.parserBuilder()
-                .setSigningKey(Keys.hmacShaKeyFor(secret.getBytes()))
-                .build()
-                .parseClaimsJws(token);
+            jwtParser.parseClaimsJws(token);
             return true;
         } catch (JwtException | IllegalArgumentException e) {
             return false;
@@ -78,12 +77,31 @@ public class JwtService {
     }
 
     public long getExpirationEpoch(String token){
-        Date exp = Jwts.parserBuilder()
-            .setSigningKey(Keys.hmacShaKeyFor(secret.getBytes()))
-            .build()
-            .parseClaimsJws(token)
+        Date exp = jwtParser.parseClaimsJws(token)
             .getBody()
             .getExpiration();
         return exp.toInstant().getEpochSecond();
     }
+
+    public long getValidityMillis() {
+        return validityMillis;
+    }
+
+    private byte[] decodeSecret(String secretValue) {
+        String trimmed = secretValue == null ? "" : secretValue.trim();
+        byte[] decoded;
+        try {
+            decoded = Base64.getDecoder().decode(trimmed);
+        } catch (IllegalArgumentException ex) {
+            decoded = trimmed.getBytes(StandardCharsets.UTF_8);
+        }
+
+        if (decoded.length < 64) {
+            throw new IllegalArgumentException(
+                "JWT secret must be at least 64 bytes when using HS512. Current length: " + decoded.length);
+        }
+
+        return decoded;
+    }
+
 }

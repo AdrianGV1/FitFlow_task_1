@@ -1,7 +1,6 @@
 package una.ac.cr.FitFlow.model;
 
-import java.time.LocalDateTime;
-
+import java.time.OffsetDateTime;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -18,7 +17,7 @@ public class CompletedActivity {
     private Long id;
 
     @Column(name = "completed_at", nullable = false)
-    private LocalDateTime completedAt;
+    private OffsetDateTime completedAt;   
 
     @Column(name = "notes", length = 500)
     private String notes;

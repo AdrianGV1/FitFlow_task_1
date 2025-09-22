@@ -36,14 +36,19 @@ public class User {
     private Set<Habit> habits = new HashSet<>();
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Routine> routines;
+    @Builder.Default
+    private List<Routine> routines = new ArrayList<>();
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<ProgressLog> progressLogs;
+    @Builder.Default
+    private List<ProgressLog> progressLogs = new ArrayList<>();
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<AuthToken> authTokens;
+    @Builder.Default
+    private List<Reminder> reminders = new ArrayList<>();
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "coach_id")
+    private User coach;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Reminder> reminders;
 }

@@ -1,14 +1,17 @@
 package una.ac.cr.FitFlow.service.Guide;
 
+import java.util.List;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-
-import una.ac.cr.FitFlow.dto.GuideDTO;
+import una.ac.cr.FitFlow.dto.Guide.GuideInputDTO;
+import una.ac.cr.FitFlow.dto.Guide.GuideOutputDTO;
 
 public interface GuideService {
-    GuideDTO createGuide(GuideDTO guideDTO);
-    GuideDTO updateGuide(Long id, GuideDTO guideDTO);
+    GuideOutputDTO createGuide(GuideInputDTO input);
+    GuideOutputDTO updateGuide(Long id, GuideInputDTO input);
     void deleteGuide(Long id);
-    GuideDTO findGuideById(Long id);
-    Page<GuideDTO> listGuides(String q, Pageable pageable);
+    GuideOutputDTO findGuideById(Long id);
+    Page<GuideOutputDTO> listGuides(String q, Pageable pageable);
+    List<GuideOutputDTO> findByHabitId(Long habitId);
 }

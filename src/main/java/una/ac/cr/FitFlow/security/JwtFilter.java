@@ -1,69 +1,72 @@
-
 package una.ac.cr.FitFlow.security;
-
-import una.ac.cr.FitFlow.model.User;
-import una.ac.cr.FitFlow.repository.AuthTokenRepository;
-import una.ac.cr.FitFlow.repository.UserRepository;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.http.*;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.authentication.AnonymousAuthenticationToken; // 👈 nuevo
+import org.springframework.security.core.Authentication;                     // 👈 nuevo
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Component
 public class JwtFilter extends OncePerRequestFilter {
-  private final JwtService jwtService;
-  private final UserRepository userRepo;
-  private final AuthTokenRepository tokenRepo;
 
-  public JwtFilter(JwtService jwtService, UserRepository userRepo, AuthTokenRepository tokenRepo) {
-    this.jwtService = jwtService; this.userRepo = userRepo; this.tokenRepo = tokenRepo;
-  }
+    private final JwtService jwtService;
 
-  @Override
-  protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
-      throws ServletException, IOException {}
-
-  /* 
-  @Override
-  protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
-      throws ServletException, IOException {
-    final String authHeader = request.getHeader("Authorization");
-    final String jwt;
-    final String userEmail;
-    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-      chain.doFilter(request, response);
-      return;
-    }
-    jwt = authHeader.substring(7);
-    userEmail = jwtService.getUserNameFromToken(jwt);
-    if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-      User user = userRepo.findByEmail(userEmail).orElse(null);
-      var isTokenValid = tokenRepo.findByToken(jwt)
-          .map(t -> !t.isExpired() && !t.isRevoked() && t.getExpiryDate().isAfter(LocalDateTime.now()))
-          .orElse(false);
-      if (user != null && isTokenValid) {
-        var authToken = new UsernamePasswordAuthenticationToken(
-            user,
-            null,
-            user.getAuthorities()
-        );  
-        authToken.setDetails(
-            new WebAuthenticationDetailsSource().buildDetails(request)
-        );
-        SecurityContextHolder.getContext().setAuthentication(authToken);
-      }
+    public JwtFilter(JwtService jwtService) {
+        this.jwtService = jwtService;
     }
 
+    @Override
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain chain)
+            throws ServletException, IOException {
 
-chain.doFilter(request, response);
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            chain.doFilter(request, response);
+            return;
+        }
 
-}*/
+        String header = request.getHeader("Authorization");
+        if (header == null || !header.startsWith("Bearer ")) {
+            chain.doFilter(request, response);
+            return;
+        }
+
+        String token = header.substring(7);
+
+        if (!jwtService.validate(token)) { // firma/exp
+            chain.doFilter(request, response);
+            return;
+        }
+
+        // ✅ Reemplaza auth si es null, anónimo o no autenticado
+        Authentication existing = SecurityContextHolder.getContext().getAuthentication();
+        boolean shouldSetAuth = (existing == null)
+                || (existing instanceof AnonymousAuthenticationToken)
+                || (!existing.isAuthenticated());
+
+        if (shouldSetAuth) {
+            String email = jwtService.getUserNameFromToken(token);
+            Set<String> roles = jwtService.getRolesFromToken(token);
+            var authorities = (roles == null ? Set.<SimpleGrantedAuthority>of()
+                    : roles.stream().map(SimpleGrantedAuthority::new).collect(Collectors.toSet()));
+
+            var auth = new UsernamePasswordAuthenticationToken(email, null, authorities);
+            auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+            SecurityContextHolder.getContext().setAuthentication(auth);
+        }
+
+        chain.doFilter(request, response);
+    }
 }

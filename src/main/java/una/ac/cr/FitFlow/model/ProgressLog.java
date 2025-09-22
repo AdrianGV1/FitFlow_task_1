@@ -2,16 +2,13 @@ package una.ac.cr.FitFlow.model;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.time.LocalDate;
+
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @Entity
 @Table(name = "progress_log")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class ProgressLog {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -26,7 +23,7 @@ public class ProgressLog {
   private Routine routine;
 
   @Column(name = "log_date", nullable = false)
-  private LocalDate logDate;
+  private OffsetDateTime logDate;   
 
   @OneToMany(mappedBy = "progressLog", cascade = CascadeType.ALL, orphanRemoval = true)
   private List<CompletedActivity> completedActivities;

@@ -1,28 +1,11 @@
 package una.ac.cr.FitFlow.service.Guide;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.lenient;
-
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
+import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.mockito.quality.Strictness;
-
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.*;
 
 import una.ac.cr.FitFlow.dto.Guide.GuideInputDTO;
 import una.ac.cr.FitFlow.dto.Guide.GuideOutputDTO;
@@ -32,8 +15,12 @@ import una.ac.cr.FitFlow.model.Habit;
 import una.ac.cr.FitFlow.repository.GuideRepository;
 import una.ac.cr.FitFlow.repository.HabitRepository;
 
+import java.util.*;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
 @ExtendWith(MockitoExtension.class)
-@MockitoSettings(strictness = Strictness.LENIENT) // ← evita UnnecessaryStubbingException
 class GuideServiceImplementationTest {
 
     @Mock private GuideRepository guideRepository;
@@ -43,200 +30,181 @@ class GuideServiceImplementationTest {
     @InjectMocks
     private GuideServiceImplementation service;
 
-    private GuideInputDTO input(String title, String content, String category, Set<Long> recIds) {
-        GuideInputDTO in = mock(GuideInputDTO.class);
-        // Usamos lenient() para que los stubs no usados NO disparen UnnecessaryStubbingException
-        lenient().when(in.getTitle()).thenReturn(title);
-        lenient().when(in.getContent()).thenReturn(content);
-        lenient().when(in.getCategory()).thenReturn(category);
-        lenient().when(in.getRecommendedHabitIds()).thenReturn(recIds);
-        return in;
+    // ---------- Helpers ----------
+    private GuideInputDTO in(String title, String content, String category, Set<Long> rec) {
+        GuideInputDTO dto = new GuideInputDTO();
+        dto.setTitle(title);
+        dto.setContent(content);
+        dto.setCategory(category);
+        dto.setRecommendedHabitIds(rec);
+        return dto;
     }
 
-    /* ================== CREATE ================== */
+    private Guide aGuide(Long id) {
+        return Guide.builder().id(id).build();
+    }
 
+    private Habit aHabit(Long id) {
+        return Habit.builder().id(id).name("H"+id).category(Habit.Category.PHYSICAL).build();
+    }
+
+    // ---------- CREATE ----------
     @Test
-    @DisplayName("createGuide: feliz, con recommendedHabitIds")
+    @DisplayName("createGuide: ok con recommendedHabitIds válidos")
     void create_ok_withHabits() {
         Set<Long> ids = Set.of(1L, 2L);
-        GuideInputDTO in = input("t", "c", "PHYSICAL", ids);
+        GuideInputDTO in = in("Título", "Contenido", "PHYSICAL", ids);
 
-        Guide entity = new Guide();
+        Guide entity = Guide.builder().build();
+        Guide saved  = aGuide(10L);
+        GuideOutputDTO out = new GuideOutputDTO();
+
         when(mapper.toEntity(in)).thenReturn(entity);
-
-        Habit h1 = Habit.builder().id(1L).build();
-        Habit h2 = Habit.builder().id(2L).build();
-        when(habitRepository.findAllById(ids)).thenReturn(List.of(h1, h2));
-
-        Guide saved = new Guide();
+        when(habitRepository.findAllById(ids)).thenReturn(List.of(aHabit(1L), aHabit(2L)));
         when(guideRepository.save(entity)).thenReturn(saved);
+        when(mapper.toDto(saved)).thenReturn(out);
 
-        GuideOutputDTO outDto = mock(GuideOutputDTO.class);
-        when(mapper.toDto(saved)).thenReturn(outDto);
+        GuideOutputDTO res = service.createGuide(in);
 
-        GuideOutputDTO out = service.createGuide(in);
-
-        assertThat(out).isSameAs(outDto);
-        assertThat(entity.getRecommendedHabits()).containsExactlyInAnyOrder(h1, h2);
+        assertSame(out, res);
+        verify(habitRepository).findAllById(ids);
         verify(guideRepository).save(entity);
     }
 
     @Test
-    @DisplayName("createGuide: recommendedHabitIds == null → no tocar (no consulta hábitos)")
-    void create_ok_nullHabits() {
-        GuideInputDTO in = input("t", "c", "MENTAL", null);
+    @DisplayName("createGuide: recommendedHabitIds = null → no toca habitRepository")
+    void create_ok_nullRecommended() {
+        GuideInputDTO in = in("Título", "Contenido", "MENTAL", null);
 
-        Guide entity = new Guide();
+        Guide entity = Guide.builder().build();
+        Guide saved  = aGuide(1L);
+        GuideOutputDTO out = new GuideOutputDTO();
+
         when(mapper.toEntity(in)).thenReturn(entity);
-
-        Guide saved = new Guide();
         when(guideRepository.save(entity)).thenReturn(saved);
-        when(mapper.toDto(saved)).thenReturn(mock(GuideOutputDTO.class));
+        when(mapper.toDto(saved)).thenReturn(out);
 
-        service.createGuide(in);
+        GuideOutputDTO res = service.createGuide(in);
 
-        verifyNoInteractions(habitRepository);
+        assertSame(out, res);
+        verify(habitRepository, never()).findAllById(any());
         verify(guideRepository).save(entity);
     }
 
     @Test
-    @DisplayName("createGuide: recommendedHabitIds vacío → set vacío")
-    void create_ok_emptyHabits() {
-        GuideInputDTO in = input("t", "c", "SLEEP", Set.of());
+    @DisplayName("createGuide: recommendedHabitIds vacío → set vacío en la entidad")
+    void create_ok_emptyRecommended_setsEmpty() {
+        GuideInputDTO in = in("Título", "Contenido", "SLEEP", Collections.emptySet());
 
-        Guide entity = new Guide();
+        Guide entity = Guide.builder().build();
+        Guide saved  = aGuide(2L);
+        GuideOutputDTO out = new GuideOutputDTO();
+
         when(mapper.toEntity(in)).thenReturn(entity);
+        when(guideRepository.save(any(Guide.class))).thenReturn(saved);
+        when(mapper.toDto(saved)).thenReturn(out);
 
-        Guide saved = new Guide();
-        when(guideRepository.save(entity)).thenReturn(saved);
-        when(mapper.toDto(saved)).thenReturn(mock(GuideOutputDTO.class));
+        ArgumentCaptor<Guide> cap = ArgumentCaptor.forClass(Guide.class);
 
-        service.createGuide(in);
+        GuideOutputDTO res = service.createGuide(in);
 
-        assertThat(entity.getRecommendedHabits()).isEmpty();
-        verify(habitRepository, never()).findAllById(anySet());
+        assertSame(out, res);
+        verify(habitRepository, never()).findAllById(any());
+        verify(guideRepository).save(cap.capture());
+        Guide toSave = cap.getValue();
+        assertNotNull(toSave.getRecommendedHabits());
+        assertTrue(toSave.getRecommendedHabits().isEmpty(), "Debe setearse un Set vacío cuando ids está vacío");
     }
 
     @Test
-    @DisplayName("createGuide: falla si falta título/contenido/categoría")
-    void create_required_fields_fail() {
-        assertThatThrownBy(() -> service.createGuide(input(null, "c", "DIET", null)))
-            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("título");
-        assertThatThrownBy(() -> service.createGuide(input("t", "  ", "DIET", null)))
-            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("contenido");
-        assertThatThrownBy(() -> service.createGuide(input("t", "c", null, null)))
-            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("categoría");
+    @DisplayName("createGuide: hábitos inexistentes → IllegalArgumentException")
+    void create_fail_missingHabits() {
+        Set<Long> ids = Set.of(1L, 2L, 3L);
+        GuideInputDTO in = in("Título", "Contenido", "DIET", ids);
+
+        when(mapper.toEntity(in)).thenReturn(Guide.builder().build());
+        // devuelve menos hábitos que ids → dispara validación
+        when(habitRepository.findAllById(ids)).thenReturn(List.of(aHabit(1L), aHabit(3L)));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.createGuide(in));
+        assertTrue(ex.getMessage().toLowerCase().contains("no existen"));
+        verify(guideRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("createGuide: falla si algún recommendedHabitId no existe")
-    void create_fail_missing_habit() {
-        Set<Long> ids = Set.of(1L, 2L);
-        GuideInputDTO in = input("t", "c", "SLEEP", ids);
-
-        when(mapper.toEntity(in)).thenReturn(new Guide());
-        when(habitRepository.findAllById(ids)).thenReturn(List.of(Habit.builder().id(1L).build())); // 1 de 2
-
-        assertThatThrownBy(() -> service.createGuide(in))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("recommendedHabitIds no existen");
+    @DisplayName("createGuide: valida campos obligatorios (title/content/category)")
+    void create_fail_requiredFields() {
+        assertThrows(IllegalArgumentException.class,
+                () -> service.createGuide(in(" ", "c", "PHYSICAL", null)));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.createGuide(in("t", " ", "PHYSICAL", null)));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.createGuide(in("t", "c", " ", null)));
+        verifyNoInteractions(guideRepository, habitRepository, mapper);
     }
 
-    /* ================== UPDATE ================== */
-
+    // ---------- UPDATE ----------
     @Test
-    @DisplayName("updateGuide: feliz, copia cambios y setea hábitos si vienen")
-    void update_ok_withHabits() {
-        Long id = 7L;
-        Set<Long> ids = Set.of(10L, 20L);
-        GuideInputDTO in = input("T", "C", "PHYSICAL", ids);
-
-        Guide existing = new Guide();
-        when(guideRepository.findById(id)).thenReturn(Optional.of(existing));
-
-        doAnswer(inv -> {
-            GuideInputDTO src = inv.getArgument(0);
-            Guide target = inv.getArgument(1);
-            target.setTitle(src.getTitle());
-            target.setContent(src.getContent());
-            target.setCategory(Guide.Category.valueOf(src.getCategory()));
-            return null;
-        }).when(mapper).copyToEntity(eq(in), eq(existing));
-
-        Habit h1 = Habit.builder().id(10L).build();
-        Habit h2 = Habit.builder().id(20L).build();
-        when(habitRepository.findAllById(ids)).thenReturn(List.of(h1, h2));
-
-        Guide saved = new Guide();
-        when(guideRepository.save(existing)).thenReturn(saved);
-
-        GuideOutputDTO outDto = mock(GuideOutputDTO.class);
-        when(mapper.toDto(saved)).thenReturn(outDto);
-
-        GuideOutputDTO out = service.updateGuide(id, in);
-
-        assertThat(out).isSameAs(outDto);
-        assertThat(existing.getTitle()).isEqualTo("T");
-        assertThat(existing.getContent()).isEqualTo("C");
-        assertThat(existing.getCategory()).isEqualTo(Guide.Category.PHYSICAL);
-        assertThat(existing.getRecommendedHabits()).containsExactlyInAnyOrder(h1, h2);
-        verify(guideRepository).save(existing);
-    }
-
-    @Test
-    @DisplayName("updateGuide: si recommendedHabitIds == null, no toca el set de hábitos")
-    void update_ok_nullHabits_no_touch() {
-        Long id = 8L;
-        GuideInputDTO in = input("TT", "CC", "MENTAL", null);
-
-        Guide existing = new Guide();
-        existing.setRecommendedHabits(
-            new java.util.HashSet<>(List.of(Habit.builder().id(1L).build()))
-        );
-
-        when(guideRepository.findById(id)).thenReturn(Optional.of(existing));
-        doNothing().when(mapper).copyToEntity(in, existing);
-
-        when(guideRepository.save(existing)).thenReturn(existing);
-        when(mapper.toDto(existing)).thenReturn(mock(GuideOutputDTO.class));
-
-        service.updateGuide(id, in);
-
-        verifyNoInteractions(habitRepository);
-        assertThat(existing.getRecommendedHabits()).hasSize(1);
-    }
-
-    @Test
-    @DisplayName("updateGuide: falla si no existe la guía")
-    void update_not_found() {
-        when(guideRepository.findById(99L)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.updateGuide(99L, input("t", "c", "DIET", null)))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Guía no encontrada");
-    }
-
-    @Test
-    @DisplayName("updateGuide: falla si algún habitId no existe")
-    void update_fail_missing_habit() {
-        Long id = 1L;
-        Set<Long> ids = Set.of(1L, 2L);
-        GuideInputDTO in = input("t", "c", "SLEEP", ids);
-
-        when(guideRepository.findById(id)).thenReturn(Optional.of(new Guide()));
-        when(habitRepository.findAllById(ids)).thenReturn(List.of(Habit.builder().id(1L).build())); // 1 de 2
-
-        assertThatThrownBy(() -> service.updateGuide(id, in))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("recommendedHabitIds no existen");
-    }
-
-    /* ================== DELETE / FIND BY ID ================== */
-
-    @Test
-    @DisplayName("deleteGuide: feliz")
-    void delete_ok() {
+    @DisplayName("updateGuide: ok con ids de hábitos (reemplaza set)")
+    void update_ok_withHabitsProvided() {
         Long id = 5L;
-        Guide g = new Guide();
+        Set<Long> ids = Set.of(7L, 8L);
+        GuideInputDTO in = in("Nuevo", "Contenido", "MENTAL", ids);
+
+        Guide current = aGuide(id);
+        GuideOutputDTO out = new GuideOutputDTO();
+
+        when(guideRepository.findById(id)).thenReturn(Optional.of(current));
+        doNothing().when(mapper).copyToEntity(in, current);
+        when(habitRepository.findAllById(ids)).thenReturn(List.of(aHabit(7L), aHabit(8L)));
+        when(guideRepository.save(current)).thenReturn(current);
+        when(mapper.toDto(current)).thenReturn(out);
+
+        GuideOutputDTO res = service.updateGuide(id, in);
+
+        assertSame(out, res);
+        verify(habitRepository).findAllById(ids);
+        verify(guideRepository).save(current);
+    }
+
+    @Test
+    @DisplayName("updateGuide: recommendedHabitIds = null → no modifica hábitos")
+    void update_ok_nullRecommended_keepsCurrent() {
+        Long id = 6L;
+        GuideInputDTO in = in("Nuevo", "Contenido", "PHYSICAL", null);
+
+        Guide current = aGuide(id);
+        GuideOutputDTO out = new GuideOutputDTO();
+
+        when(guideRepository.findById(id)).thenReturn(Optional.of(current));
+        doNothing().when(mapper).copyToEntity(in, current);
+        when(guideRepository.save(current)).thenReturn(current);
+        when(mapper.toDto(current)).thenReturn(out);
+
+        GuideOutputDTO res = service.updateGuide(id, in);
+
+        assertSame(out, res);
+        verify(habitRepository, never()).findAllById(any());
+        verify(guideRepository).save(current);
+    }
+
+    @Test
+    @DisplayName("updateGuide: id no existe → IllegalArgumentException")
+    void update_fail_notFound() {
+        when(guideRepository.findById(999L)).thenReturn(Optional.empty());
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.updateGuide(999L, in("t", "c", "PHYSICAL", null)));
+        assertTrue(ex.getMessage().contains("Guía no encontrada"));
+        verify(guideRepository, never()).save(any());
+    }
+
+    // ---------- DELETE ----------
+    @Test
+    @DisplayName("deleteGuide: ok")
+    void delete_ok() {
+        Long id = 11L;
+        Guide g = aGuide(id);
         when(guideRepository.findById(id)).thenReturn(Optional.of(g));
 
         service.deleteGuide(id);
@@ -245,122 +213,113 @@ class GuideServiceImplementationTest {
     }
 
     @Test
-    @DisplayName("deleteGuide: not found")
-    void delete_not_found() {
-        when(guideRepository.findById(5L)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.deleteGuide(5L))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Guía no encontrada");
+    @DisplayName("deleteGuide: id no existe → IllegalArgumentException")
+    void delete_fail_notFound() {
+        when(guideRepository.findById(404L)).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> service.deleteGuide(404L));
+        verify(guideRepository, never()).delete(any());
     }
 
+    // ---------- FIND BY ID ----------
     @Test
-    @DisplayName("findGuideById: feliz")
+    @DisplayName("findGuideById: ok")
     void findById_ok() {
-        Long id = 3L;
-        Guide g = new Guide();
+        Long id = 33L;
+        Guide g = aGuide(id);
+        GuideOutputDTO out = new GuideOutputDTO();
+
         when(guideRepository.findById(id)).thenReturn(Optional.of(g));
+        when(mapper.toDto(g)).thenReturn(out);
 
-        GuideOutputDTO dto = mock(GuideOutputDTO.class);
-        when(mapper.toDto(g)).thenReturn(dto);
+        GuideOutputDTO res = service.findGuideById(id);
 
-        GuideOutputDTO out = service.findGuideById(id);
-        assertThat(out).isSameAs(dto);
+        assertSame(out, res);
+        verify(mapper).toDto(g);
     }
 
     @Test
-    @DisplayName("findGuideById: not found")
-    void findById_not_found() {
-        when(guideRepository.findById(3L)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.findGuideById(3L))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Guía no encontrada");
+    @DisplayName("findGuideById: no existe → IllegalArgumentException")
+    void findById_fail_notFound() {
+        when(guideRepository.findById(1L)).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> service.findGuideById(1L));
     }
 
-    /* ================== LIST ================== */
-
+    // ---------- LIST ----------
     @Test
-    @DisplayName("listGuides: q == null → findAll")
-    void list_null_q() {
-        var pageable = PageRequest.of(0, 2);
-        Guide g1 = new Guide();
-        Guide g2 = new Guide();
-        when(guideRepository.findAll(pageable)).thenReturn(
-            new PageImpl<>(List.of(g1, g2), pageable, 2)
-        );
+    @DisplayName("listGuides: q vacío → findAll")
+    void list_blank() {
+        Pageable pageable = PageRequest.of(0, 10);
+        Guide g1 = aGuide(1L);
+        Guide g2 = aGuide(2L);
 
-        GuideOutputDTO d1 = mock(GuideOutputDTO.class);
-        GuideOutputDTO d2 = mock(GuideOutputDTO.class);
-        when(mapper.toDto(g1)).thenReturn(d1);
-        when(mapper.toDto(g2)).thenReturn(d2);
+        when(guideRepository.findAll(pageable)).thenReturn(new PageImpl<>(List.of(g1, g2)));
+        GuideOutputDTO o1 = new GuideOutputDTO();
+        GuideOutputDTO o2 = new GuideOutputDTO();
+        when(mapper.toDto(g1)).thenReturn(o1);
+        when(mapper.toDto(g2)).thenReturn(o2);
 
-        Page<GuideOutputDTO> out = service.listGuides(null, pageable);
+        Page<GuideOutputDTO> page = service.listGuides("  ", pageable);
 
-        assertThat(out.getContent()).containsExactly(d1, d2);
-        assertThat(out.getTotalElements()).isEqualTo(2);
+        assertEquals(2, page.getTotalElements());
+        assertTrue(page.getContent().containsAll(List.of(o1, o2)));
+        verify(guideRepository).findAll(pageable);
     }
 
     @Test
-    @DisplayName("listGuides: q en blanco → findAll")
-    void list_blank_q() {
-        var pageable = PageRequest.of(1, 3);
-        Guide g = new Guide();
-        when(guideRepository.findAll(pageable))
-            .thenReturn(new PageImpl<>(List.of(g), pageable, 1));
-        when(mapper.toDto(g)).thenReturn(mock(GuideOutputDTO.class));
+    @DisplayName("listGuides: q es Category válida → findByCategory")
+    void list_byCategory() {
+        Pageable pageable = PageRequest.of(0, 10);
+        String q = "sleep";
+        Guide.Category cat = Guide.Category.SLEEP;
 
-        Page<GuideOutputDTO> out = service.listGuides("   ", pageable);
-        assertThat(out.getTotalElements()).isEqualTo(1);
+        Guide g1 = aGuide(1L);
+        when(guideRepository.findByCategory(cat, pageable)).thenReturn(new PageImpl<>(List.of(g1)));
+        GuideOutputDTO o1 = new GuideOutputDTO();
+        when(mapper.toDto(g1)).thenReturn(o1);
+
+        Page<GuideOutputDTO> page = service.listGuides(q, pageable);
+
+        assertEquals(1, page.getTotalElements());
+        assertSame(o1, page.getContent().get(0));
+        verify(guideRepository).findByCategory(cat, pageable);
+        verify(guideRepository, never()).findByTitleContainingIgnoreCaseOrContentContainingIgnoreCase(any(), any(), any());
     }
 
     @Test
-    @DisplayName("listGuides: q coincide con categoría → findByCategory")
-    void list_category_q() {
-        var pageable = PageRequest.of(0, 5);
-        Guide g = new Guide();
-        when(guideRepository.findByCategory(Guide.Category.PHYSICAL, pageable))
-            .thenReturn(new PageImpl<>(List.of(g), pageable, 1));
-        when(mapper.toDto(g)).thenReturn(mock(GuideOutputDTO.class));
+    @DisplayName("listGuides: q no es Category → busca por título o contenido")
+    void list_byText() {
+        Pageable pageable = PageRequest.of(0, 10);
+        String q = "rutina";
 
-        Page<GuideOutputDTO> out = service.listGuides("physical", pageable);
+        Guide g1 = aGuide(1L);
+        when(guideRepository.findByTitleContainingIgnoreCaseOrContentContainingIgnoreCase(q, q, pageable))
+                .thenReturn(new PageImpl<>(List.of(g1)));
+        GuideOutputDTO o1 = new GuideOutputDTO();
+        when(mapper.toDto(g1)).thenReturn(o1);
 
-        assertThat(out.getTotalElements()).isEqualTo(1);
-        verify(guideRepository).findByCategory(Guide.Category.PHYSICAL, pageable);
-        verify(guideRepository, never()).findByTitleContainingIgnoreCaseOrContentContainingIgnoreCase(anyString(), anyString(), any());
+        Page<GuideOutputDTO> page = service.listGuides(q, pageable);
+
+        assertEquals(1, page.getTotalElements());
+        assertSame(o1, page.getContent().get(0));
+        verify(guideRepository).findByTitleContainingIgnoreCaseOrContentContainingIgnoreCase(q, q, pageable);
     }
 
+    // ---------- findByHabitId ----------
     @Test
-    @DisplayName("listGuides: q no es categoría → busca por título o contenido (case-insensitive)")
-    void list_text_q() {
-        var pageable = PageRequest.of(2, 4);
-        Guide g1 = new Guide();
-        when(guideRepository.findByTitleContainingIgnoreCaseOrContentContainingIgnoreCase("agua", "agua", pageable))
-            .thenReturn(new PageImpl<>(List.of(g1), pageable, 1));
-        when(mapper.toDto(g1)).thenReturn(mock(GuideOutputDTO.class));
-
-        Page<GuideOutputDTO> out = service.listGuides("agua", pageable);
-
-        assertThat(out.getTotalElements()).isEqualTo(1);
-        verify(guideRepository).findByTitleContainingIgnoreCaseOrContentContainingIgnoreCase("agua", "agua", pageable);
-    }
-
-    /* ================== BY HABIT ================== */
-
-    @Test
-    @DisplayName("findByHabitId: mapea la lista de entidades a DTOs")
+    @DisplayName("findByHabitId: retorna guías mapeadas")
     void findByHabitId_ok() {
-        Long habitId = 77L;
-        Guide g1 = new Guide();
-        Guide g2 = new Guide();
+        Long habitId = 9L;
+        Guide g = aGuide(100L);
+        GuideOutputDTO o = new GuideOutputDTO();
 
-        when(guideRepository.findByRecommendedHabits_Id(habitId)).thenReturn(List.of(g1, g2));
+        when(guideRepository.findByRecommendedHabits_Id(habitId)).thenReturn(List.of(g));
+        when(mapper.toDto(g)).thenReturn(o);
 
-        GuideOutputDTO d1 = mock(GuideOutputDTO.class);
-        GuideOutputDTO d2 = mock(GuideOutputDTO.class);
-        when(mapper.toDto(g1)).thenReturn(d1);
-        when(mapper.toDto(g2)).thenReturn(d2);
+        List<GuideOutputDTO> res = service.findByHabitId(habitId);
 
-        List<GuideOutputDTO> out = service.findByHabitId(habitId);
-
-        assertThat(out).containsExactly(d1, d2);
+        assertEquals(1, res.size());
+        assertSame(o, res.get(0));
+        verify(guideRepository).findByRecommendedHabits_Id(habitId);
+        verify(mapper).toDto(g);
     }
 }

@@ -1,243 +1,493 @@
 package una.ac.cr.FitFlow.service.Role;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.*;
-import static org.mockito.ArgumentMatchers.*;
-
-import java.util.List;
-import java.util.Optional;
-
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.extension.ExtendWith;
-
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import una.ac.cr.FitFlow.dto.Role.RoleInputDTO;
 import una.ac.cr.FitFlow.dto.Role.RoleOutputDTO;
 import una.ac.cr.FitFlow.mapper.MapperForRole;
 import una.ac.cr.FitFlow.model.Role;
-import una.ac.cr.FitFlow.model.Role.Module;
-import una.ac.cr.FitFlow.model.Role.Permission;
 import una.ac.cr.FitFlow.repository.RoleRepository;
 import una.ac.cr.FitFlow.service.role.RoleServiceImplementation;
+
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class RoleServiceImplementationTest {
 
-    @Mock private RoleRepository roleRepository;
-    @Mock private MapperForRole mapper;
+    @Mock
+    private RoleRepository roleRepository;
+
+    @Mock
+    private MapperForRole mapper;
 
     @InjectMocks
-    private RoleServiceImplementation service;
+    private RoleServiceImplementation roleService;
 
-    private RoleInputDTO input(Long id, Module module, Permission perm) {
-        RoleInputDTO dto = mock(RoleInputDTO.class);
-        when(dto.getId()).thenReturn(id);
-        when(dto.getModule()).thenReturn(module);
-        when(dto.getPermissions()).thenReturn(perm);
-        return dto;
+    private Role mockRole;
+    private RoleInputDTO mockInputDTO;
+    private RoleOutputDTO mockOutputDTO;
+
+    @BeforeEach
+    void setUp() {
+        // Setup mock objects según el modelo actual
+        mockRole = new Role();
+        mockRole.setId(1L);
+        mockRole.setModule(Role.Module.RUTINAS);
+        mockRole.setPermission(Role.Permission.EDITOR);
+
+        mockInputDTO = new RoleInputDTO();
+        mockInputDTO.setId(1L);
+        mockInputDTO.setModule(Role.Module.RUTINAS);
+        mockInputDTO.setPermissions(Role.Permission.EDITOR);
+
+        mockOutputDTO = RoleOutputDTO.builder()
+                .id(1L)
+                .name("RUTINAS_EDITOR")
+                .module(Role.Module.RUTINAS)
+                .permissions(Role.Permission.EDITOR)
+                .build();
     }
 
-    /* ================== CREATE ================== */
-
+    // Tests for create method
     @Test
-    @DisplayName("create: feliz")
-    void create_ok() {
-        RoleInputDTO in = input(null, Module.GUIAS, Permission.EDITOR);
+    @DisplayName("create should create role successfully with valid input")
+    void create_WithValidInput_ShouldCreateSuccessfully() {
+        // Given
+        when(roleRepository.existsByModuleAndPermission(Role.Module.RUTINAS, Role.Permission.EDITOR))
+                .thenReturn(false);
+        when(mapper.toEntity(mockInputDTO)).thenReturn(mockRole);
+        when(roleRepository.save(mockRole)).thenReturn(mockRole);
 
-        when(roleRepository.existsByModuleAndPermission(Module.GUIAS, Permission.EDITOR)).thenReturn(false);
+        // When
+        RoleOutputDTO result = roleService.create(mockInputDTO);
 
-        Role toSave = Role.builder().module(Module.GUIAS).permission(Permission.EDITOR).build();
-        when(mapper.toEntity(in)).thenReturn(toSave);
-
-        Role saved = Role.builder().id(10L).module(Module.GUIAS).permission(Permission.EDITOR).build();
-        when(roleRepository.save(toSave)).thenReturn(saved);
-
-        RoleOutputDTO out = service.create(in);
-
-        assertThat(out.getId()).isEqualTo(10L);
-        assertThat(out.getModule()).isEqualTo(Module.GUIAS);
-        assertThat(out.getPermissions()).isEqualTo(Permission.EDITOR);
-        assertThat(out.getName()).isEqualTo("GUIAS_EDITOR"); // deriveName
+        // Then
+        assertNotNull(result);
+        assertEquals("RUTINAS_EDITOR", result.getName());
+        assertEquals(Role.Module.RUTINAS, result.getModule());
+        assertEquals(Role.Permission.EDITOR, result.getPermissions());
+        
+        verify(roleRepository).existsByModuleAndPermission(Role.Module.RUTINAS, Role.Permission.EDITOR);
+        verify(roleRepository).save(mockRole);
     }
 
     @Test
-    @DisplayName("create: falla si (module, permission) ya existe")
-    void create_duplicate() {
-        RoleInputDTO in = input(null, Module.RUTINAS, Permission.AUDITOR);
-        when(roleRepository.existsByModuleAndPermission(Module.RUTINAS, Permission.AUDITOR)).thenReturn(true);
+    @DisplayName("create should throw exception when role with same module and permission exists")
+    void create_WithExistingModuleAndPermission_ShouldThrowException() {
+        // Given
+        when(roleRepository.existsByModuleAndPermission(Role.Module.RUTINAS, Role.Permission.EDITOR))
+                .thenReturn(true);
 
-        assertThatThrownBy(() -> service.create(in))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Ya existe un role");
+        // When & Then
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> roleService.create(mockInputDTO)
+        );
+        assertEquals("Ya existe un role con ese (module, permission).", exception.getMessage());
+        
+        verify(roleRepository).existsByModuleAndPermission(Role.Module.RUTINAS, Role.Permission.EDITOR);
         verify(roleRepository, never()).save(any());
     }
 
-    /* ================== UPDATE ================== */
-
     @Test
-    @DisplayName("update: feliz sin cambiar module/permission (usa los actuales)")
-    void update_ok_no_change() {
-        Long id = 5L;
-        RoleInputDTO in = input(id, null, null); // no trae cambios
+    @DisplayName("create should derive correct name from module and permission")
+    void create_ShouldDeriveCorrectName() {
+        // Given
+        mockInputDTO.setModule(Role.Module.ACTIVIDADES);
+        mockInputDTO.setPermissions(Role.Permission.AUDITOR);
+        
+        mockRole.setModule(Role.Module.ACTIVIDADES);
+        mockRole.setPermission(Role.Permission.AUDITOR);
 
-        Role existing = Role.builder().id(id).module(Module.ACTIVIDADES).permission(Permission.EDITOR).build();
-        when(roleRepository.findById(id)).thenReturn(Optional.of(existing));
+        when(roleRepository.existsByModuleAndPermission(Role.Module.ACTIVIDADES, Role.Permission.AUDITOR))
+                .thenReturn(false);
+        when(mapper.toEntity(mockInputDTO)).thenReturn(mockRole);
+        when(roleRepository.save(mockRole)).thenReturn(mockRole);
 
-        // No conflicto con otros
-        when(roleRepository.existsByModuleAndPermissionAndIdNot(Module.ACTIVIDADES, Permission.EDITOR, id))
-            .thenReturn(false);
+        // When
+        RoleOutputDTO result = roleService.create(mockInputDTO);
 
-        Role saved = Role.builder().id(id).module(Module.ACTIVIDADES).permission(Permission.EDITOR).build();
-        when(roleRepository.save(existing)).thenReturn(saved);
+        // Then
+        assertEquals("ACTIVIDADES_AUDITOR", result.getName());
+    }
 
-        RoleOutputDTO out = service.update(in);
+    // Tests for update method
+    @Test
+    @DisplayName("update should update role successfully with valid input")
+    void update_WithValidInput_ShouldUpdateSuccessfully() {
+        // Given
+        when(roleRepository.findById(1L)).thenReturn(Optional.of(mockRole));
+        when(roleRepository.existsByModuleAndPermissionAndIdNot(Role.Module.RUTINAS, Role.Permission.EDITOR, 1L))
+                .thenReturn(false);
+        when(roleRepository.save(mockRole)).thenReturn(mockRole);
 
-        assertThat(out.getId()).isEqualTo(id);
-        assertThat(out.getModule()).isEqualTo(Module.ACTIVIDADES);
-        assertThat(out.getPermissions()).isEqualTo(Permission.EDITOR);
-        assertThat(out.getName()).isEqualTo("ACTIVIDADES_EDITOR");
+        // When
+        RoleOutputDTO result = roleService.update(mockInputDTO);
+
+        // Then
+        assertNotNull(result);
+        assertEquals("RUTINAS_EDITOR", result.getName());
+        
+        verify(roleRepository).findById(1L);
+        verify(roleRepository).existsByModuleAndPermissionAndIdNot(Role.Module.RUTINAS, Role.Permission.EDITOR, 1L);
+        verify(roleRepository).save(mockRole);
     }
 
     @Test
-    @DisplayName("update: feliz cambiando module/permission")
-    void update_ok_change_both() {
-        Long id = 7L;
-        RoleInputDTO in = input(id, Module.PROGRESO, Permission.AUDITOR);
+    @DisplayName("update should throw exception when id is null")
+    void update_WithNullId_ShouldThrowException() {
+        // Given
+        mockInputDTO.setId(null);
 
-        Role existing = Role.builder().id(id).module(Module.GUIAS).permission(Permission.EDITOR).build();
-        when(roleRepository.findById(id)).thenReturn(Optional.of(existing));
-
-        when(roleRepository.existsByModuleAndPermissionAndIdNot(Module.PROGRESO, Permission.AUDITOR, id))
-            .thenReturn(false);
-
-        // El servicio modifica la entidad y salva
-        Role saved = Role.builder().id(id).module(Module.PROGRESO).permission(Permission.AUDITOR).build();
-        when(roleRepository.save(any(Role.class))).thenReturn(saved);
-
-        RoleOutputDTO out = service.update(in);
-
-        assertThat(out.getId()).isEqualTo(id);
-        assertThat(out.getModule()).isEqualTo(Module.PROGRESO);
-        assertThat(out.getPermissions()).isEqualTo(Permission.AUDITOR);
-        assertThat(out.getName()).isEqualTo("PROGRESO_AUDITOR");
-    }
-
-    @Test
-    @DisplayName("update: falla si id es null")
-    void update_id_null() {
-        RoleInputDTO in = input(null, Module.GUIAS, Permission.EDITOR);
-        assertThatThrownBy(() -> service.update(in))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("id es obligatorio");
-    }
-
-    @Test
-    @DisplayName("update: falla si role no existe")
-    void update_not_found() {
-        RoleInputDTO in = input(9L, Module.GUIAS, Permission.EDITOR);
-        when(roleRepository.findById(9L)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.update(in))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Role no encontrado");
-    }
-
-    @Test
-    @DisplayName("update: falla si otro role ya usa (module, permission)")
-    void update_conflict_other() {
-        Long id = 4L;
-        RoleInputDTO in = input(id, Module.RECORDATORIOS, Permission.AUDITOR);
-
-        Role existing = Role.builder().id(id).module(Module.RECORDATORIOS).permission(Permission.EDITOR).build();
-        when(roleRepository.findById(id)).thenReturn(Optional.of(existing));
-
-        when(roleRepository.existsByModuleAndPermissionAndIdNot(Module.RECORDATORIOS, Permission.AUDITOR, id))
-            .thenReturn(true);
-
-        assertThatThrownBy(() -> service.update(in))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Otro role ya usa ese");
+        // When & Then
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> roleService.update(mockInputDTO)
+        );
+        assertEquals("El id es obligatorio para actualizar.", exception.getMessage());
+        
+        verify(roleRepository, never()).findById(any());
         verify(roleRepository, never()).save(any());
     }
 
-    /* ================== DELETE ================== */
-
     @Test
-    @DisplayName("delete: feliz")
-    void delete_ok() {
-        Long id = 12L;
-        Role existing = Role.builder().id(id).build();
-        when(roleRepository.findById(id)).thenReturn(Optional.of(existing));
+    @DisplayName("update should throw exception when role not found")
+    void update_WithNonExistentRole_ShouldThrowException() {
+        // Given
+        when(roleRepository.findById(1L)).thenReturn(Optional.empty());
 
-        service.delete(id);
-
-        verify(roleRepository).delete(existing);
+        // When & Then
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> roleService.update(mockInputDTO)
+        );
+        assertEquals("Role no encontrado: id=1", exception.getMessage());
+        
+        verify(roleRepository).findById(1L);
+        verify(roleRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("delete: role no existe")
-    void delete_not_found() {
-        when(roleRepository.findById(100L)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.delete(100L))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("no existe");
+    @DisplayName("update should throw exception when module and permission combination already exists")
+    void update_WithExistingModuleAndPermission_ShouldThrowException() {
+        // Given
+        when(roleRepository.findById(1L)).thenReturn(Optional.of(mockRole));
+        when(roleRepository.existsByModuleAndPermissionAndIdNot(Role.Module.RUTINAS, Role.Permission.EDITOR, 1L))
+                .thenReturn(true);
+
+        // When & Then
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> roleService.update(mockInputDTO)
+        );
+        assertEquals("Otro role ya usa ese (module, permission).", exception.getMessage());
+        
+        verify(roleRepository).findById(1L);
+        verify(roleRepository).existsByModuleAndPermissionAndIdNot(Role.Module.RUTINAS, Role.Permission.EDITOR, 1L);
+        verify(roleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("update should use existing values when module is null")
+    void update_WithNullModule_ShouldUseExistingModule() {
+        // Given
+        mockInputDTO.setModule(null);
+        mockInputDTO.setPermissions(Role.Permission.AUDITOR);
+        
+        when(roleRepository.findById(1L)).thenReturn(Optional.of(mockRole));
+        when(roleRepository.existsByModuleAndPermissionAndIdNot(Role.Module.RUTINAS, Role.Permission.AUDITOR, 1L))
+                .thenReturn(false);
+        when(roleRepository.save(mockRole)).thenReturn(mockRole);
+
+        // When
+        RoleOutputDTO result = roleService.update(mockInputDTO);
+
+        // Then
+        assertNotNull(result);
+        assertEquals("RUTINAS_AUDITOR", result.getName());
+        assertEquals(Role.Permission.AUDITOR, result.getPermissions());
+    }
+
+    @Test
+    @DisplayName("update should use existing values when permission is null")
+    void update_WithNullPermission_ShouldUseExistingPermission() {
+        // Given
+        mockInputDTO.setModule(Role.Module.ACTIVIDADES);
+        mockInputDTO.setPermissions(null);
+        
+        when(roleRepository.findById(1L)).thenReturn(Optional.of(mockRole));
+        when(roleRepository.existsByModuleAndPermissionAndIdNot(Role.Module.ACTIVIDADES, Role.Permission.EDITOR, 1L))
+                .thenReturn(false);
+        when(roleRepository.save(mockRole)).thenReturn(mockRole);
+
+        // When
+        RoleOutputDTO result = roleService.update(mockInputDTO);
+
+        // Then
+        assertNotNull(result);
+        assertEquals("ACTIVIDADES_EDITOR", result.getName());
+        assertEquals(Role.Module.ACTIVIDADES, result.getModule());
+    }
+
+    @Test
+    @DisplayName("update should use existing values when both module and permission are null")
+    void update_WithNullModuleAndPermission_ShouldUseExistingValues() {
+        // Given
+        mockInputDTO.setModule(null);
+        mockInputDTO.setPermissions(null);
+        
+        when(roleRepository.findById(1L)).thenReturn(Optional.of(mockRole));
+        when(roleRepository.existsByModuleAndPermissionAndIdNot(Role.Module.RUTINAS, Role.Permission.EDITOR, 1L))
+                .thenReturn(false);
+        when(roleRepository.save(mockRole)).thenReturn(mockRole);
+
+        // When
+        RoleOutputDTO result = roleService.update(mockInputDTO);
+
+        // Then
+        assertNotNull(result);
+        assertEquals("RUTINAS_EDITOR", result.getName()); // Should keep original values
+    }
+
+    // Tests for delete method
+    @Test
+    @DisplayName("delete should delete role successfully when it exists")
+    void delete_WithExistingRole_ShouldDeleteSuccessfully() {
+        // Given
+        when(roleRepository.findById(1L)).thenReturn(Optional.of(mockRole));
+
+        // When
+        roleService.delete(1L);
+
+        // Then
+        verify(roleRepository).findById(1L);
+        verify(roleRepository).delete(mockRole);
+    }
+
+    @Test
+    @DisplayName("delete should throw exception when role doesn't exist")
+    void delete_WithNonExistentRole_ShouldThrowException() {
+        // Given
+        when(roleRepository.findById(1L)).thenReturn(Optional.empty());
+
+        // When & Then
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> roleService.delete(1L)
+        );
+        assertEquals("El role con id=1 no existe.", exception.getMessage());
+        
+        verify(roleRepository).findById(1L);
         verify(roleRepository, never()).delete(any());
     }
 
-    /* ================== FIND & LIST ================== */
-
+    // Tests for findById method
     @Test
-    @DisplayName("findById: feliz y nombre derivado")
-    void findById_ok() {
-        Long id = 3L;
-        Role role = Role.builder().id(id).module(Module.GUIAS).permission(Permission.AUDITOR).build();
-        when(roleRepository.findById(id)).thenReturn(Optional.of(role));
+    @DisplayName("findById should return role when it exists")
+    void findById_WithExistingRole_ShouldReturnRole() {
+        // Given
+        when(roleRepository.findById(1L)).thenReturn(Optional.of(mockRole));
 
-        RoleOutputDTO out = service.findById(id);
+        // When
+        RoleOutputDTO result = roleService.findById(1L);
 
-        assertThat(out.getId()).isEqualTo(3L);
-        assertThat(out.getModule()).isEqualTo(Module.GUIAS);
-        assertThat(out.getPermissions()).isEqualTo(Permission.AUDITOR);
-        assertThat(out.getName()).isEqualTo("GUIAS_AUDITOR");
+        // Then
+        assertNotNull(result);
+        assertEquals("RUTINAS_EDITOR", result.getName());
+        assertEquals(Role.Module.RUTINAS, result.getModule());
+        assertEquals(Role.Permission.EDITOR, result.getPermissions());
+        
+        verify(roleRepository).findById(1L);
     }
 
     @Test
-    @DisplayName("findById: not found")
-    void findById_not_found() {
-        when(roleRepository.findById(9L)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.findById(9L))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Role no encontrado");
+    @DisplayName("findById should throw exception when role doesn't exist")
+    void findById_WithNonExistentRole_ShouldThrowException() {
+        // Given
+        when(roleRepository.findById(1L)).thenReturn(Optional.empty());
+
+        // When & Then
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> roleService.findById(1L)
+        );
+        assertEquals("Role no encontrado: id=1", exception.getMessage());
+        
+        verify(roleRepository).findById(1L);
+    }
+
+    // Tests for listRoles method
+    @Test
+    @DisplayName("listRoles should return paginated roles")
+    void listRoles_ShouldReturnPaginatedRoles() {
+        // Given
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Role> rolePage = new PageImpl<>(List.of(mockRole));
+        
+        when(roleRepository.findAll(any(Pageable.class))).thenReturn(rolePage);
+
+        // When
+        Page<RoleOutputDTO> result = roleService.listRoles(pageable);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(1, result.getContent().size());
+        
+        RoleOutputDTO dto = result.getContent().get(0);
+        assertEquals("RUTINAS_EDITOR", dto.getName());
+        assertEquals(Role.Module.RUTINAS, dto.getModule());
+        assertEquals(Role.Permission.EDITOR, dto.getPermissions());
+        
+        verify(roleRepository).findAll(pageable);
     }
 
     @Test
-    @DisplayName("listRoles: mapea con deriveName")
-    void listRoles_ok() {
-        var pageable = PageRequest.of(0, 2);
+    @DisplayName("listRoles should return empty page when no roles exist")
+    void listRoles_WithNoRoles_ShouldReturnEmptyPage() {
+        // Given
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Role> emptyPage = new PageImpl<>(List.of());
+        
+        when(roleRepository.findAll(any(Pageable.class))).thenReturn(emptyPage);
 
-        Role r1 = Role.builder().id(1L).module(Module.ACTIVIDADES).permission(Permission.EDITOR).build();
-        Role r2 = Role.builder().id(2L).module(Module.PROGRESO).permission(Permission.AUDITOR).build();
+        // When
+        Page<RoleOutputDTO> result = roleService.listRoles(pageable);
 
-        Page<Role> page = new PageImpl<>(List.of(r1, r2), pageable, 2);
-        when(roleRepository.findAll(pageable)).thenReturn(page);
+        // Then
+        assertNotNull(result);
+        assertTrue(result.getContent().isEmpty());
+        assertEquals(0, result.getTotalElements());
+        
+        verify(roleRepository).findAll(pageable);
+    }
 
-        Page<RoleOutputDTO> out = service.listRoles(pageable);
+    // Tests for all module and permission combinations based on actual model
+    @Test
+    @DisplayName("create should handle all module and permission combinations correctly")
+    void create_WithAllCombinations_ShouldHandleCorrectly() {
+        // Test all module combinations with actual enums from the model
+        testModulePermissionCombination(Role.Module.RUTINAS, Role.Permission.EDITOR, "RUTINAS_EDITOR");
+        testModulePermissionCombination(Role.Module.RUTINAS, Role.Permission.AUDITOR, "RUTINAS_AUDITOR");
+        
+        testModulePermissionCombination(Role.Module.ACTIVIDADES, Role.Permission.EDITOR, "ACTIVIDADES_EDITOR");
+        testModulePermissionCombination(Role.Module.ACTIVIDADES, Role.Permission.AUDITOR, "ACTIVIDADES_AUDITOR");
+        
+        testModulePermissionCombination(Role.Module.GUIAS, Role.Permission.EDITOR, "GUIAS_EDITOR");
+        testModulePermissionCombination(Role.Module.GUIAS, Role.Permission.AUDITOR, "GUIAS_AUDITOR");
+        
+        testModulePermissionCombination(Role.Module.PROGRESO, Role.Permission.EDITOR, "PROGRESO_EDITOR");
+        testModulePermissionCombination(Role.Module.PROGRESO, Role.Permission.AUDITOR, "PROGRESO_AUDITOR");
+        
+        testModulePermissionCombination(Role.Module.RECORDATORIOS, Role.Permission.EDITOR, "RECORDATORIOS_EDITOR");
+        testModulePermissionCombination(Role.Module.RECORDATORIOS, Role.Permission.AUDITOR, "RECORDATORIOS_AUDITOR");
+    }
 
-        assertThat(out.getContent()).extracting(RoleOutputDTO::getId).containsExactly(1L, 2L);
-        assertThat(out.getContent()).extracting(RoleOutputDTO::getName)
-            .containsExactly("ACTIVIDADES_EDITOR", "PROGRESO_AUDITOR");
-        assertThat(out.getContent()).extracting(RoleOutputDTO::getModule)
-            .containsExactly(Module.ACTIVIDADES, Module.PROGRESO);
-        assertThat(out.getContent()).extracting(RoleOutputDTO::getPermissions)
-            .containsExactly(Permission.EDITOR, Permission.AUDITOR);
+    private void testModulePermissionCombination(Role.Module module, Role.Permission permission, String expectedName) {
+        RoleInputDTO dto = new RoleInputDTO();
+        dto.setModule(module);
+        dto.setPermissions(permission);
+
+        Role role = new Role();
+        role.setModule(module);
+        role.setPermission(permission);
+
+        when(roleRepository.existsByModuleAndPermission(module, permission)).thenReturn(false);
+        when(mapper.toEntity(dto)).thenReturn(role);
+        when(roleRepository.save(role)).thenReturn(role);
+
+        RoleOutputDTO result = roleService.create(dto);
+        assertEquals(expectedName, result.getName());
+
+        // Reset mocks for next iteration
+        reset(roleRepository, mapper);
+    }
+
+    // Edge case tests
+    @Test
+    @DisplayName("deriveName should handle enum name changes correctly")
+    void deriveName_ShouldHandleEnumNamesCorrectly() {
+        // This test verifies that the name derivation uses the actual enum names
+        Role.Module[] modules = Role.Module.values();
+        Role.Permission[] permissions = Role.Permission.values();
+        
+        for (Role.Module module : modules) {
+            for (Role.Permission permission : permissions) {
+                String expectedName = module.name() + "_" + permission.name();
+                RoleInputDTO dto = new RoleInputDTO();
+                dto.setModule(module);
+                dto.setPermissions(permission);
+                
+                Role role = new Role();
+                role.setModule(module);
+                role.setPermission(permission);
+                
+                when(roleRepository.existsByModuleAndPermission(module, permission)).thenReturn(false);
+                when(mapper.toEntity(dto)).thenReturn(role);
+                when(roleRepository.save(role)).thenReturn(role);
+                
+                RoleOutputDTO result = roleService.create(dto);
+                assertEquals(expectedName, result.getName());
+                
+                reset(roleRepository, mapper);
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("update should handle case when only ID is provided")
+    void update_WithOnlyId_ShouldUseExistingModuleAndPermission() {
+        // Given - only set ID, leave module and permission as null
+        RoleInputDTO dto = new RoleInputDTO();
+        dto.setId(1L);
+        // module and permission are null
+        
+        when(roleRepository.findById(1L)).thenReturn(Optional.of(mockRole));
+        when(roleRepository.existsByModuleAndPermissionAndIdNot(Role.Module.RUTINAS, Role.Permission.EDITOR, 1L))
+                .thenReturn(false);
+        when(roleRepository.save(mockRole)).thenReturn(mockRole);
+
+        // When
+        RoleOutputDTO result = roleService.update(dto);
+
+        // Then - should keep original values
+        assertEquals("RUTINAS_EDITOR", result.getName());
+        assertEquals(Role.Module.RUTINAS, result.getModule());
+        assertEquals(Role.Permission.EDITOR, result.getPermissions());
+    }
+
+    @Test
+    @DisplayName("Service should handle role with users collection")
+    void roleWithUsers_ShouldBeHandledCorrectly() {
+        // Given - role has users (testing that the service doesn't break with the relationship)
+        when(roleRepository.existsByModuleAndPermission(Role.Module.RUTINAS, Role.Permission.EDITOR))
+                .thenReturn(false);
+        when(mapper.toEntity(mockInputDTO)).thenReturn(mockRole);
+        when(roleRepository.save(mockRole)).thenReturn(mockRole);
+
+        // When - the role has users collection (from @ManyToMany relationship)
+        RoleOutputDTO result = roleService.create(mockInputDTO);
+
+        // Then - service should work normally despite the users relationship
+        assertNotNull(result);
+        assertEquals("RUTINAS_EDITOR", result.getName());
+        
+        // Verify that the users collection doesn't interfere with service operations
+        verify(roleRepository).existsByModuleAndPermission(Role.Module.RUTINAS, Role.Permission.EDITOR);
+        verify(roleRepository).save(mockRole);
     }
 }

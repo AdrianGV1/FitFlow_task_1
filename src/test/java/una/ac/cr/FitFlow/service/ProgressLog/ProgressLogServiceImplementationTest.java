@@ -1,28 +1,12 @@
 package una.ac.cr.FitFlow.service.ProgressLog;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.*;
-import static org.mockito.ArgumentMatchers.*;
-
-import java.time.OffsetDateTime;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
-import java.util.List;
-import java.util.Optional;
-
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
+import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.*;
 
 import una.ac.cr.FitFlow.dto.ProgressLog.ProgressLogInputDTO;
 import una.ac.cr.FitFlow.dto.ProgressLog.ProgressLogOutputDTO;
@@ -33,7 +17,16 @@ import una.ac.cr.FitFlow.model.User;
 import una.ac.cr.FitFlow.repository.ProgressLogRepository;
 import una.ac.cr.FitFlow.repository.RoutineRepository;
 import una.ac.cr.FitFlow.repository.UserRepository;
-import una.ac.cr.FitFlow.service.ProgressLog.ProgressLogServiceImplementation;
+
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.*;
 
 @ExtendWith(MockitoExtension.class)
 class ProgressLogServiceImplementationTest {
@@ -46,278 +39,317 @@ class ProgressLogServiceImplementationTest {
     @InjectMocks
     private ProgressLogServiceImplementation service;
 
-    private ProgressLogInputDTO input(Long userId, Long routineId, OffsetDateTime date) {
-        ProgressLogInputDTO in = mock(ProgressLogInputDTO.class);
-        when(in.getUserId()).thenReturn(userId);
-        when(in.getRoutineId()).thenReturn(routineId);
-        when(in.getDate()).thenReturn(date);
-        return in;
+    private User user;
+    private Routine routine;
+    private ProgressLog entity;
+    private ProgressLogOutputDTO out;
+    private ProgressLogInputDTO in;
+
+    // fechas fijas deterministas
+    private static final ZoneId CR = ZoneId.of("America/Costa_Rica");
+    private static final OffsetDateTime DATE_UTC =
+            OffsetDateTime.of(2025, 9, 22, 12, 34, 56, 0, ZoneOffset.UTC);
+
+    @BeforeEach
+    void setUp() {
+        user = new User();
+        user.setId(1L);
+
+        routine = new Routine();
+        routine.setId(10L);
+
+        entity = new ProgressLog();
+
+        out = new ProgressLogOutputDTO(); // asumiendo ctor vacío o builder en tu DTO
+
+        in = new ProgressLogInputDTO();
+        in.setUserId(1L);
+        in.setRoutineId(10L);
+        in.setDate(DATE_UTC);
     }
 
-    /* ================== CREATE ================== */
-
+    // -------- CREATE --------
     @Test
-    @DisplayName("create: feliz")
+    @DisplayName("create: ok")
     void create_ok() {
-        var when = OffsetDateTime.now(ZoneOffset.UTC);
-        var in = input(11L, 22L, when);
-
-        User u = User.builder().id(11L).build();
-        Routine r = Routine.builder().id(22L).build();
-        when(userRepo.findById(11L)).thenReturn(Optional.of(u));
-        when(routineRepo.findById(22L)).thenReturn(Optional.of(r));
-
-        ProgressLog entity = ProgressLog.builder().id(99L).user(u).routine(r).logDate(when).build();
-        when(mapper.toEntity(in, u, r)).thenReturn(entity);
-
+        when(userRepo.findById(1L)).thenReturn(Optional.of(user));
+        when(routineRepo.findById(10L)).thenReturn(Optional.of(routine));
+        when(mapper.toEntity(in, user, routine)).thenReturn(entity);
         when(repo.save(entity)).thenReturn(entity);
+        when(mapper.toDto(entity)).thenReturn(out);
 
-        ProgressLogOutputDTO outDto = mock(ProgressLogOutputDTO.class);
-        when(mapper.toDto(entity)).thenReturn(outDto);
+        ProgressLogOutputDTO result = service.create(in);
 
-        ProgressLogOutputDTO out = service.create(in);
-
-        assertThat(out).isSameAs(outDto);
+        assertNotNull(result);
+        assertSame(out, result);
+        verify(userRepo).findById(1L);
+        verify(routineRepo).findById(10L);
         verify(repo).save(entity);
     }
 
     @Test
-    @DisplayName("create: falla si faltan campos obligatorios")
-    void create_fail_required() {
-        assertThatThrownBy(() -> service.create(input(null, 1L, OffsetDateTime.now())))
-            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("userId");
-        assertThatThrownBy(() -> service.create(input(1L, null, OffsetDateTime.now())))
-            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("routineId");
-        assertThatThrownBy(() -> service.create(input(1L, 2L, null)))
-            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("date");
+    @DisplayName("create: userId null → IllegalArgumentException")
+    void create_userIdNull() {
+        in.setUserId(null);
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.create(in));
+        assertEquals("userId es obligatorio.", ex.getMessage());
+        verifyNoInteractions(userRepo, routineRepo, repo, mapper);
     }
 
     @Test
-    @DisplayName("create: usuario/rutina no encontrados")
-    void create_fail_not_found_relations() {
-        var in = input(11L, 22L, OffsetDateTime.now());
-        when(userRepo.findById(11L)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.create(in))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Usuario no encontrado");
-
-        when(userRepo.findById(11L)).thenReturn(Optional.of(User.builder().id(11L).build()));
-        when(routineRepo.findById(22L)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.create(in))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Rutina no encontrada");
+    @DisplayName("create: routineId null → IllegalArgumentException")
+    void create_routineIdNull() {
+        in.setRoutineId(null);
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.create(in));
+        assertEquals("routineId es obligatorio.", ex.getMessage());
     }
 
-    /* ================== UPDATE ================== */
+    @Test
+    @DisplayName("create: date null → IllegalArgumentException")
+    void create_dateNull() {
+        in.setDate(null);
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.create(in));
+        assertEquals("date es obligatorio.", ex.getMessage());
+    }
 
     @Test
-    @DisplayName("update: feliz sin cambiar user/routine (no consulta repos de relaciones)")
-    void update_ok_no_relation_change() {
-        Long id = 7L;
-        User u = User.builder().id(1L).build();
-        Routine r = Routine.builder().id(2L).build();
-        ProgressLog current = ProgressLog.builder().id(id).user(u).routine(r).logDate(OffsetDateTime.now()).build();
+    @DisplayName("create: usuario no existe")
+    void create_userNotFound() {
+        when(userRepo.findById(1L)).thenReturn(Optional.empty());
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.create(in));
+        assertEquals("Usuario no encontrado: 1", ex.getMessage());
+        verify(userRepo).findById(1L);
+        verifyNoMoreInteractions(userRepo);
+        verifyNoInteractions(routineRepo, repo, mapper);
+    }
 
-        when(repo.findById(id)).thenReturn(Optional.of(current));
+    @Test
+    @DisplayName("create: rutina no existe")
+    void create_routineNotFound() {
+        when(userRepo.findById(1L)).thenReturn(Optional.of(user));
+        when(routineRepo.findById(10L)).thenReturn(Optional.empty());
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.create(in));
+        assertEquals("Rutina no encontrada: 10", ex.getMessage());
+        verify(userRepo).findById(1L);
+        verify(routineRepo).findById(10L);
+        verifyNoMoreInteractions(routineRepo);
+        verifyNoInteractions(repo, mapper);
+    }
 
-        // input con mismos IDs => no debería buscar user/routine
-        var in = input(1L, 2L, OffsetDateTime.now());
+    // -------- UPDATE --------
+    @Test
+    @DisplayName("update: ok (sin cambio de user/routine, NO busca nada)")
+    void update_ok_noChanges() {
+        // current con MISMO user/routine que 'in' (1L / 10L)
+        User currentUser = new User(); currentUser.setId(1L);
+        Routine currentRoutine = new Routine(); currentRoutine.setId(10L);
 
-        doNothing().when(mapper).copyToEntity(eq(in), eq(current), isNull(), isNull());
+        ProgressLog current = new ProgressLog();
+        current.setUser(currentUser);
+        current.setRoutine(currentRoutine);
+
+        when(repo.findById(99L)).thenReturn(Optional.of(current));
         when(repo.save(current)).thenReturn(current);
+        when(mapper.toDto(current)).thenReturn(out);
 
-        ProgressLogOutputDTO dto = mock(ProgressLogOutputDTO.class);
-        when(mapper.toDto(current)).thenReturn(dto);
+        ProgressLogOutputDTO res = service.update(99L, in);
 
-        ProgressLogOutputDTO out = service.update(id, in);
-
-        assertThat(out).isSameAs(dto);
-        verify(userRepo, never()).findById(any());
-        verify(routineRepo, never()).findById(any());
+        assertSame(out, res);
+        // no dispara búsquedas
+        verify(userRepo, never()).findById(anyLong());
+        verify(routineRepo, never()).findById(anyLong());
+        verify(mapper).copyToEntity(in, current, null, null);
         verify(repo).save(current);
     }
 
     @Test
-    @DisplayName("update: cambia user y routine → busca/valida nuevas relaciones")
-    void update_ok_with_relation_changes() {
-        Long id = 7L;
-        User uOld = User.builder().id(1L).build();
-        Routine rOld = Routine.builder().id(2L).build();
-        ProgressLog current = ProgressLog.builder().id(id).user(uOld).routine(rOld).logDate(OffsetDateTime.now()).build();
+    @DisplayName("update: id no existe")
+    void update_notFound() {
+        when(repo.findById(999L)).thenReturn(Optional.empty());
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.update(999L, in));
+        assertEquals("ProgressLog no encontrado: 999", ex.getMessage());
+    }
 
-        when(repo.findById(id)).thenReturn(Optional.of(current));
+    @Test
+    @DisplayName("update: cambia userId → busca usuario (no rutina)")
+    void update_changeUser_onlyUser() {
+        // current con misma rutina = 10L (NO busca rutina)
+        Routine sameRoutine = new Routine(); sameRoutine.setId(10L);
+        // usuario actual distinto para forzar búsqueda de nuevo user
+        User currentUser = new User(); currentUser.setId(3L);
 
-        var in = input(10L, 20L, OffsetDateTime.now()); // distintos => cambia
+        ProgressLog current = new ProgressLog();
+        current.setRoutine(sameRoutine);
+        current.setUser(currentUser);
 
-        User uNew = User.builder().id(10L).build();
-        Routine rNew = Routine.builder().id(20L).build();
-        when(userRepo.findById(10L)).thenReturn(Optional.of(uNew));
-        when(routineRepo.findById(20L)).thenReturn(Optional.of(rNew));
-
-        doNothing().when(mapper).copyToEntity(eq(in), eq(current), eq(uNew), eq(rNew));
+        // in ya tiene userId=1L, routineId=10L
+        when(repo.findById(50L)).thenReturn(Optional.of(current));
+        when(userRepo.findById(1L)).thenReturn(Optional.of(user));
         when(repo.save(current)).thenReturn(current);
+        when(mapper.toDto(current)).thenReturn(out);
 
-        ProgressLogOutputDTO dto = mock(ProgressLogOutputDTO.class);
-        when(mapper.toDto(current)).thenReturn(dto);
+        ProgressLogOutputDTO res = service.update(50L, in);
 
-        ProgressLogOutputDTO out = service.update(id, in);
-
-        assertThat(out).isSameAs(dto);
-        verify(userRepo).findById(10L);
-        verify(routineRepo).findById(20L);
-        verify(repo).save(current);
+        assertSame(out, res);
+        verify(userRepo).findById(1L);
+        verify(routineRepo, never()).findById(anyLong());
+        verify(mapper).copyToEntity(in, current, user, null);
     }
 
     @Test
-    @DisplayName("update: progressLog no encontrado")
-    void update_not_found() {
-        when(repo.findById(99L)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.update(99L, input(1L, 2L, OffsetDateTime.now())))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("ProgressLog no encontrado");
+    @DisplayName("update: cambia routineId → busca rutina (no usuario)")
+    void update_changeRoutine_onlyRoutine() {
+        // current con mismo usuario = 1L (NO busca usuario)
+        User sameUser = new User(); sameUser.setId(1L);
+        // rutina actual distinta para forzar búsqueda de nueva rutina
+        Routine currentRoutine = new Routine(); currentRoutine.setId(20L);
+
+        ProgressLog current = new ProgressLog();
+        current.setUser(sameUser);
+        current.setRoutine(currentRoutine);
+
+        when(repo.findById(51L)).thenReturn(Optional.of(current));
+        when(routineRepo.findById(10L)).thenReturn(Optional.of(routine)); // in.getRoutineId() = 10L
+        when(repo.save(current)).thenReturn(current);
+        when(mapper.toDto(current)).thenReturn(out);
+
+        ProgressLogOutputDTO res = service.update(51L, in);
+
+        assertSame(out, res);
+        verify(routineRepo).findById(10L);
+        verify(userRepo, never()).findById(anyLong());
+        verify(mapper).copyToEntity(in, current, null, routine);
     }
 
     @Test
-    @DisplayName("update: nuevo userId/routineId no existen")
-    void update_fail_new_relations_not_found() {
-        Long id = 1L;
-        ProgressLog current = ProgressLog.builder().id(id).build();
-        when(repo.findById(id)).thenReturn(Optional.of(current));
+    @DisplayName("update: nuevo usuario no existe")
+    void update_newUserNotFound() {
+        // current con rutina = 10L para que sólo dispare user
+        Routine sameRoutine = new Routine(); sameRoutine.setId(10L);
+        User currentUser = new User(); currentUser.setId(3L);
 
-        // caso: user no existe
-        var inUser = input(10L, null, OffsetDateTime.now());
-        when(userRepo.findById(10L)).thenReturn(Optional.empty());
+        ProgressLog current = new ProgressLog();
+        current.setRoutine(sameRoutine);
+        current.setUser(currentUser);
 
-        assertThatThrownBy(() -> service.update(id, inUser))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Usuario no encontrado");
+        when(repo.findById(52L)).thenReturn(Optional.of(current));
+        when(userRepo.findById(1L)).thenReturn(Optional.empty()); // in.getUserId() = 1L
 
-        // caso: routine no existe
-        var inRoutine = input(null, 20L, OffsetDateTime.now());
-        when(routineRepo.findById(20L)).thenReturn(Optional.empty());
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.update(52L, in));
+        assertEquals("Usuario no encontrado: 1", ex.getMessage());
 
-        assertThatThrownBy(() -> service.update(id, inRoutine))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Rutina no encontrada");
+        verify(userRepo).findById(1L);
+        verify(repo, never()).save(any());
     }
 
-    /* ================== DELETE ================== */
-
     @Test
-    @DisplayName("delete: feliz")
+    @DisplayName("update: nueva rutina no existe")
+    void update_newRoutineNotFound() {
+        // current con user = 1L para que sólo dispare rutina
+        User sameUser = new User(); sameUser.setId(1L);
+        Routine currentRoutine = new Routine(); currentRoutine.setId(20L);
+
+        ProgressLog current = new ProgressLog();
+        current.setUser(sameUser);
+        current.setRoutine(currentRoutine);
+
+        when(repo.findById(53L)).thenReturn(Optional.of(current));
+        when(routineRepo.findById(10L)).thenReturn(Optional.empty()); // in.getRoutineId() = 10L
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.update(53L, in));
+        assertEquals("Rutina no encontrada: 10", ex.getMessage());
+
+        verify(routineRepo).findById(10L);
+        verify(repo, never()).save(any());
+    }
+
+    // -------- DELETE --------
+    @Test
+    @DisplayName("delete: ok")
     void delete_ok() {
-        when(repo.existsById(5L)).thenReturn(true);
-        service.delete(5L);
-        verify(repo).deleteById(5L);
+        when(repo.existsById(77L)).thenReturn(true);
+        service.delete(77L);
+        verify(repo).deleteById(77L);
     }
 
     @Test
-    @DisplayName("delete: not found")
-    void delete_not_found() {
-        when(repo.existsById(5L)).thenReturn(false);
-        assertThatThrownBy(() -> service.delete(5L))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("ProgressLog no encontrado");
+    @DisplayName("delete: no existe → IllegalArgumentException")
+    void delete_notFound() {
+        when(repo.existsById(77L)).thenReturn(false);
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.delete(77L));
+        assertEquals("ProgressLog no encontrado: 77", ex.getMessage());
         verify(repo, never()).deleteById(any());
     }
 
-    /* ================== FIND / LIST ================== */
-
+    // -------- FIND --------
     @Test
-    @DisplayName("findById: feliz")
+    @DisplayName("findById: ok")
     void findById_ok() {
-        ProgressLog e = ProgressLog.builder().id(3L).build();
-        when(repo.findById(3L)).thenReturn(Optional.of(e));
+        when(repo.findById(5L)).thenReturn(Optional.of(entity));
+        when(mapper.toDto(entity)).thenReturn(out);
 
-        ProgressLogOutputDTO dto = mock(ProgressLogOutputDTO.class);
-        when(mapper.toDto(e)).thenReturn(dto);
+        ProgressLogOutputDTO res = service.findById(5L);
 
-        ProgressLogOutputDTO out = service.findById(3L);
-        assertThat(out).isSameAs(dto);
+        assertSame(out, res);
+        verify(mapper).toDto(entity);
     }
 
     @Test
-    @DisplayName("findById: not found")
-    void findById_not_found() {
-        when(repo.findById(3L)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.findById(3L))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("ProgressLog no encontrado");
+    @DisplayName("findById: no existe")
+    void findById_notFound() {
+        when(repo.findById(5L)).thenReturn(Optional.empty());
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.findById(5L));
+        assertEquals("ProgressLog no encontrado: 5", ex.getMessage());
     }
 
+    // -------- LIST --------
     @Test
-    @DisplayName("list: delega a repo.findAll(pageable) y mapea")
+    @DisplayName("list: pagina elementos")
     void list_ok() {
-        var pageable = PageRequest.of(0, 2);
-        ProgressLog e1 = ProgressLog.builder().id(1L).build();
-        ProgressLog e2 = ProgressLog.builder().id(2L).build();
+        Pageable pageable = PageRequest.of(0, 10);
+        when(repo.findAll(pageable)).thenReturn(new PageImpl<>(List.of(entity)));
+        when(mapper.toDto(entity)).thenReturn(out);
 
-        when(repo.findAll(pageable)).thenReturn(new PageImpl<>(List.of(e1, e2), pageable, 2));
+        Page<ProgressLogOutputDTO> page = service.list(pageable);
 
-        ProgressLogOutputDTO d1 = mock(ProgressLogOutputDTO.class);
-        ProgressLogOutputDTO d2 = mock(ProgressLogOutputDTO.class);
-        when(mapper.toDto(e1)).thenReturn(d1);
-        when(mapper.toDto(e2)).thenReturn(d2);
-
-        Page<ProgressLogOutputDTO> out = service.list(pageable);
-
-        assertThat(out.getContent()).containsExactly(d1, d2);
+        assertEquals(1, page.getTotalElements());
+        assertSame(out, page.getContent().get(0));
     }
 
     @Test
-    @DisplayName("listByUser: delega a repo.findByUser_Id(userId, pageable) y mapea")
+    @DisplayName("listByUser: pagina por usuario")
     void listByUser_ok() {
-        var pageable = PageRequest.of(1, 3);
-        Long userId = 77L;
-        ProgressLog e = ProgressLog.builder().id(5L).build();
+        Pageable pageable = PageRequest.of(0, 10);
+        when(repo.findByUser_Id(1L, pageable)).thenReturn(new PageImpl<>(List.of(entity)));
+        when(mapper.toDto(entity)).thenReturn(out);
 
-        when(repo.findByUser_Id(userId, pageable)).thenReturn(new PageImpl<>(List.of(e), pageable, 1));
+        Page<ProgressLogOutputDTO> page = service.listByUser(1L, pageable);
 
-        ProgressLogOutputDTO d = mock(ProgressLogOutputDTO.class);
-        when(mapper.toDto(e)).thenReturn(d);
-
-        Page<ProgressLogOutputDTO> out = service.listByUser(userId, pageable);
-
-        assertThat(out.getContent()).containsExactly(d);
+        assertEquals(1, page.getTotalElements());
+        assertSame(out, page.getContent().get(0));
     }
 
-    /* ================== listByUserOnDate ================== */
-
+    // -------- listByUserOnDate (zona horaria CR) --------
     @Test
-    @DisplayName("listByUserOnDate: calcula inicio/fin del día en America/Costa_Rica y consulta repo")
+    @DisplayName("listByUserOnDate: convierte a día local CR y consulta entre [start, end)")
     void listByUserOnDate_ok() {
-        Long userId = 55L;
-
-        // 2025-09-18 06:30:00Z (UTC) -> en Costa Rica (UTC-6) es 2025-09-18 00:30-06
-        OffsetDateTime inputDate = OffsetDateTime.of(2025, 9, 18, 6, 30, 0, 0, ZoneOffset.UTC);
-
-        ProgressLog e1 = ProgressLog.builder().id(1L).build();
-        when(repo.findByUser_IdAndLogDateBetween(eq(userId), any(), any()))
-            .thenReturn(List.of(e1));
-
-        ProgressLogOutputDTO d1 = mock(ProgressLogOutputDTO.class);
-        when(mapper.toDto(e1)).thenReturn(d1);
-
-        List<ProgressLogOutputDTO> out = service.listByUserOnDate(userId, inputDate);
-
-        assertThat(out).containsExactly(d1);
-
-        // Capturamos los límites calculados
         ArgumentCaptor<OffsetDateTime> startCap = ArgumentCaptor.forClass(OffsetDateTime.class);
-        ArgumentCaptor<OffsetDateTime> endCap = ArgumentCaptor.forClass(OffsetDateTime.class);
+        ArgumentCaptor<OffsetDateTime> endCap   = ArgumentCaptor.forClass(OffsetDateTime.class);
 
-        verify(repo).findByUser_IdAndLogDateBetween(eq(userId), startCap.capture(), endCap.capture());
+        when(repo.findByUser_IdAndLogDateBetween(eq(1L), startCap.capture(), endCap.capture()))
+                .thenReturn(List.of(entity));
+        when(mapper.toDto(entity)).thenReturn(out);
 
-        ZoneId cr = ZoneId.of("America/Costa_Rica");
-        // El día local debe ser 2025-09-18
-        var localDate = inputDate.atZoneSameInstant(cr).toLocalDate();
-        var expectedStart = localDate.atStartOfDay(cr).toOffsetDateTime();
-        var expectedEnd = localDate.plusDays(1).atStartOfDay(cr).toOffsetDateTime();
+        List<ProgressLogOutputDTO> result = service.listByUserOnDate(1L, DATE_UTC);
 
-        assertThat(startCap.getValue()).isEqualTo(expectedStart);
-        assertThat(endCap.getValue()).isEqualTo(expectedEnd);
-        assertThat(endCap.getValue()).isAfter(startCap.getValue());
+        assertEquals(1, result.size());
+        assertSame(out, result.get(0));
+
+        var localCR = DATE_UTC.atZoneSameInstant(CR).toLocalDate();
+        var expectedStart = localCR.atStartOfDay(CR).toOffsetDateTime();
+        var expectedEnd   = localCR.plusDays(1).atStartOfDay(CR).toOffsetDateTime();
+
+        assertEquals(expectedStart, startCap.getValue(), "start (CR 00:00) incorrecto");
+        assertEquals(expectedEnd,   endCap.getValue(),   "end (CR 00:00 del día siguiente) incorrecto");
     }
 }

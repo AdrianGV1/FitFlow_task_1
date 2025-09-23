@@ -8,7 +8,7 @@
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
     <version>3.5.4</version>
-    <relativePath />
+    <relativePath/>
   </parent>
 
   <groupId>una.ac.cr</groupId>
@@ -19,6 +19,14 @@
 
   <properties>
     <java.version>21</java.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.release>21</maven.compiler.release>
+    <!-- Mockito para inline mock-maker en tests -->
+    <mockito.inline.version>5.2.0</mockito.inline.version>
+    <!-- JaCoCo -->
+    <jacoco.version>0.8.12</jacoco.version>
+    <!-- Surefire moderno -->
+    <surefire.version>3.2.5</surefire.version>
   </properties>
 
   <dependencies>
@@ -92,7 +100,7 @@
       <scope>runtime</scope>
     </dependency>
 
-    <!-- Testing (Boot gestiona versiones de JUnit/Mockito) -->
+    <!-- Testing -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
@@ -108,23 +116,24 @@
       <artifactId>h2</artifactId>
       <scope>test</scope>
     </dependency>
-    <!-- Si quieres explícitamente JUnit + Mockito JUnit Jupiter, puedes añadir esto sin versión:
+
+    <!-- Mockito inline (para mockear clases final, etc.) -->
     <dependency>
       <groupId>org.mockito</groupId>
-      <artifactId>mockito-junit-jupiter</artifactId>
+      <artifactId>mockito-inline</artifactId>
+      <version>${mockito.inline.version}</version>
       <scope>test</scope>
     </dependency>
-    -->
   </dependencies>
 
   <build>
     <plugins>
-      <!-- Compiler (Lombok como annotation processor) -->
+      <!-- Compiler -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
         <configuration>
-          <release>21</release>
+          <release>${maven.compiler.release}</release>
           <annotationProcessorPaths>
             <path>
               <groupId>org.projectlombok</groupId>
@@ -134,14 +143,41 @@
         </configuration>
       </plugin>
 
+      <!-- JaCoCo -->
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>${jacoco.version}</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>report</id>
+            <phase>test</phase>
+            <goals>
+              <goal>report</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- Surefire: integra con JaCoCo usando ${argLine} y desactiva module-path -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <version>3.2.5</version>
+        <version>${surefire.version}</version>
         <configuration>
-          <argLine>
-            -javaagent:${settings.localRepository}/org/mockito/mockito-core/5.12.0/mockito-core-5.12.0.jar
-          </argLine>
+          <argLine>${argLine} -Xshare:off</argLine>
+          <useModulePath>false</useModulePath>
+          <trimStackTrace>false</trimStackTrace>
+          <includes>
+            <include>/*Test.java</include>
+            <include>/*Tests.java</include>
+            <include>/*TestCase.java</include>
+          </includes>
         </configuration>
       </plugin>
 
@@ -168,6 +204,7 @@
         </executions>
       </plugin>
 
+      <!-- Añade la carpeta de fuentes generadas por el codegen -->
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>build-helper-maven-plugin</artifactId>
@@ -187,6 +224,7 @@
         </executions>
       </plugin>
 
+      <!-- Spring Boot -->
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
@@ -197,38 +235,6 @@
               <artifactId>lombok</artifactId>
             </exclude>
           </excludes>
-        </configuration>
-      </plugin>
-
-      <!-- JaCoCo -->
-      <plugin>
-        <groupId>org.jacoco</groupId>
-        <artifactId>jacoco-maven-plugin</artifactId>
-        <version>0.8.12</version>
-        <executions>
-          <execution>
-            <goals>
-              <goal>prepare-agent</goal>
-            </goals>
-          </execution>
-          <execution>
-            <id>report</id>
-            <phase>test</phase>
-            <goals>
-              <goal>report</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-
-      <!-- Surefire (sin -javaagent de Mockito) -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-surefire-plugin</artifactId>
-        <version>3.5.3</version>
-        <configuration>
-          <argLine>@{argLine}</argLine>
-          <trimStackTrace>false</trimStackTrace>
         </configuration>
       </plugin>
     </plugins>

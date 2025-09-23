@@ -11,6 +11,7 @@ import java.util.stream.Collectors;
 public class MapperForGuide {
 
     public GuideOutputDTO toDto(Guide g) {
+        if (g == null) return null;
         return GuideOutputDTO.builder()
                 .id(g.getId())
                 .title(g.getTitle())

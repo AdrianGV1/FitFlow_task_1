@@ -1,30 +1,23 @@
 package una.ac.cr.FitFlow.service.Habit;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.*;
-import static org.mockito.ArgumentMatchers.*;
-
-import java.util.List;
-import java.util.Optional;
-
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
+import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.*;
 
 import una.ac.cr.FitFlow.dto.Habit.HabitInputDTO;
 import una.ac.cr.FitFlow.dto.Habit.HabitOutputDTO;
 import una.ac.cr.FitFlow.mapper.MapperForHabit;
 import una.ac.cr.FitFlow.model.Habit;
 import una.ac.cr.FitFlow.repository.HabitRepository;
+
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class HabitServiceImplementationTest {
@@ -35,267 +28,272 @@ class HabitServiceImplementationTest {
     @InjectMocks
     private HabitServiceImplementation service;
 
-    /* ================== CREATE ================== */
+    private HabitInputDTO input(String name, String category) {
+        HabitInputDTO in = new HabitInputDTO();
+        in.setName(name);
+        in.setCategory(category);
+        return in;
+    }
 
+    private Habit aHabit(Long id, String name, Habit.Category cat) {
+        return Habit.builder()
+                .id(id)
+                .name(name)
+                .category(cat)
+                .build();
+    }
+
+    // ---------- CREATE ----------
     @Test
-    @DisplayName("createHabit: feliz")
+    @DisplayName("createHabit: ok")
     void create_ok() {
-        HabitInputDTO in = mock(HabitInputDTO.class);
-        when(in.getName()).thenReturn("Beber agua");
-        when(in.getCategory()).thenReturn("DIET");
+        HabitInputDTO in = input("Caminar", Habit.Category.PHYSICAL.name());
+        Habit entityToSave = aHabit(null, "Caminar", Habit.Category.PHYSICAL);
+        Habit saved = aHabit(1L, "Caminar", Habit.Category.PHYSICAL);
+        HabitOutputDTO out = new HabitOutputDTO();
 
-        when(habitRepository.existsByName("Beber agua")).thenReturn(false);
+        when(habitRepository.existsByName("Caminar")).thenReturn(false);
+        when(mapper.toEntity(in)).thenReturn(entityToSave);
+        when(habitRepository.save(entityToSave)).thenReturn(saved);
+        when(mapper.toDto(saved)).thenReturn(out);
 
-        Habit entity = Habit.builder().id(1L).name("Beber agua").category(Habit.Category.DIET).build();
-        when(mapper.toEntity(in)).thenReturn(entity);
+        HabitOutputDTO result = service.createHabit(in);
 
-        Habit saved = Habit.builder().id(1L).name("Beber agua").category(Habit.Category.DIET).build();
-        when(habitRepository.save(entity)).thenReturn(saved);
-
-        HabitOutputDTO outDto = mock(HabitOutputDTO.class);
-        when(mapper.toDto(saved)).thenReturn(outDto);
-
-        HabitOutputDTO out = service.createHabit(in);
-
-        assertThat(out).isSameAs(outDto);
-        verify(habitRepository).save(entity);
+        assertSame(out, result);
+        verify(habitRepository).existsByName("Caminar");
+        verify(habitRepository).save(entityToSave);
     }
 
     @Test
-    @DisplayName("createHabit: falla si name es null o en blanco")
-    void create_fail_name_required() {
-        HabitInputDTO in1 = mock(HabitInputDTO.class);
-        when(in1.getName()).thenReturn(null);
+    @DisplayName("createHabit: nombre nulo o en blanco → error")
+    void create_nameBlank() {
+        HabitInputDTO in1 = input(null, Habit.Category.MENTAL.name());
+        IllegalArgumentException ex1 = assertThrows(IllegalArgumentException.class, () -> service.createHabit(in1));
+        assertEquals("El nombre del hábito es obligatorio.", ex1.getMessage());
 
-        assertThatThrownBy(() -> service.createHabit(in1))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("El nombre del hábito es obligatorio");
+        HabitInputDTO in2 = input("   ", Habit.Category.MENTAL.name());
+        IllegalArgumentException ex2 = assertThrows(IllegalArgumentException.class, () -> service.createHabit(in2));
+        assertEquals("El nombre del hábito es obligatorio.", ex2.getMessage());
 
-        HabitInputDTO in2 = mock(HabitInputDTO.class);
-        when(in2.getName()).thenReturn("   ");
-
-        assertThatThrownBy(() -> service.createHabit(in2))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("El nombre del hábito es obligatorio");
+        verifyNoInteractions(habitRepository, mapper);
     }
 
     @Test
-    @DisplayName("createHabit: falla si category es null o en blanco")
-    void create_fail_category_required() {
-        HabitInputDTO in = mock(HabitInputDTO.class);
-        when(in.getName()).thenReturn("Dormir 8h");
-        when(in.getCategory()).thenReturn("  ");
+    @DisplayName("createHabit: categoría nula o en blanco → error")
+    void create_categoryBlank() {
+        HabitInputDTO in1 = input("Caminar", null);
+        IllegalArgumentException ex1 = assertThrows(IllegalArgumentException.class, () -> service.createHabit(in1));
+        assertEquals("La categoría es obligatoria.", ex1.getMessage());
 
-        assertThatThrownBy(() -> service.createHabit(in))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("La categoría es obligatoria");
+        HabitInputDTO in2 = input("Caminar", "   ");
+        IllegalArgumentException ex2 = assertThrows(IllegalArgumentException.class, () -> service.createHabit(in2));
+        assertEquals("La categoría es obligatoria.", ex2.getMessage());
+
+        verifyNoInteractions(habitRepository, mapper);
     }
 
     @Test
-    @DisplayName("createHabit: falla si name ya existe")
-    void create_fail_duplicate_name() {
-        HabitInputDTO in = mock(HabitInputDTO.class);
-        when(in.getName()).thenReturn("Correr");
-        when(in.getCategory()).thenReturn("PHYSICAL");
+    @DisplayName("createHabit: nombre duplicado → error")
+    void create_nameDuplicated() {
+        HabitInputDTO in = input("Caminar", Habit.Category.DIET.name());
+        when(habitRepository.existsByName("Caminar")).thenReturn(true);
 
-        when(habitRepository.existsByName("Correr")).thenReturn(true);
-
-        assertThatThrownBy(() -> service.createHabit(in))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("ya está en uso");
-        verify(mapper, never()).toEntity(any());
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.createHabit(in));
+        assertEquals("El nombre del hábito ya está en uso.", ex.getMessage());
+        verify(habitRepository).existsByName("Caminar");
+        verify(habitRepository, never()).save(any());
     }
 
-    /* ================== UPDATE ================== */
-
+    // ---------- UPDATE ----------
     @Test
-    @DisplayName("updateHabit: feliz (cambia nombre sin conflicto)")
-    void update_ok() {
+    @DisplayName("updateHabit: ok (sin cambiar nombre)")
+    void update_ok_noNameChange() {
         Long id = 5L;
+        Habit existing = aHabit(id, "Caminar", Habit.Category.PHYSICAL);
+        HabitInputDTO in = input("Caminar", Habit.Category.PHYSICAL.name());
+        HabitOutputDTO out = new HabitOutputDTO();
 
-        Habit existing = Habit.builder().id(id).name("Viejo").category(Habit.Category.MENTAL).build();
         when(habitRepository.findById(id)).thenReturn(Optional.of(existing));
-
-        HabitInputDTO in = mock(HabitInputDTO.class);
-        when(in.getName()).thenReturn("Nuevo");           // cambia nombre
-        when(in.getCategory()).thenReturn("MENTAL");      // opcional, igual
-        when(habitRepository.existsByName("Nuevo")).thenReturn(false);
-
-        // copyToEntity aplica cambios sobre existing
-        doAnswer(inv -> {
-            HabitInputDTO src = inv.getArgument(0);
-            Habit target = inv.getArgument(1);
-            if (src.getName() != null) target.setName(src.getName());
-            // si tu mapper hace parsing de category, puedes simularlo también
-            return null;
-        }).when(mapper).copyToEntity(eq(in), eq(existing));
-
         when(habitRepository.save(existing)).thenReturn(existing);
-        HabitOutputDTO outDto = mock(HabitOutputDTO.class);
-        when(mapper.toDto(existing)).thenReturn(outDto);
+        when(mapper.toDto(existing)).thenReturn(out);
 
-        HabitOutputDTO out = service.updateHabit(id, in);
+        HabitOutputDTO res = service.updateHabit(id, in);
 
-        assertThat(out).isSameAs(outDto);
-        assertThat(existing.getName()).isEqualTo("Nuevo");
+        assertSame(out, res);
+        verify(habitRepository, never()).existsByName(anyString()); // no verifica duplicado si no cambió
+        verify(mapper).copyToEntity(in, existing);
         verify(habitRepository).save(existing);
     }
 
     @Test
-    @DisplayName("updateHabit: falla si no existe el hábito")
-    void update_not_found() {
+    @DisplayName("updateHabit: id no existe → error")
+    void update_notFound() {
         when(habitRepository.findById(99L)).thenReturn(Optional.empty());
-
-        HabitInputDTO in = mock(HabitInputDTO.class);
-        assertThatThrownBy(() -> service.updateHabit(99L, in))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Hábito no encontrado");
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.updateHabit(99L, input("Caminar", Habit.Category.PHYSICAL.name())));
+        assertEquals("Hábito no encontrado.", ex.getMessage());
     }
 
     @Test
-    @DisplayName("updateHabit: falla si name es vacío cuando viene informado")
-    void update_fail_blank_name() {
-        Long id = 1L;
-        Habit existing = Habit.builder().id(id).name("Existente").build();
+    @DisplayName("updateHabit: nombre en blanco → error")
+    void update_blankName() {
+        Long id = 5L;
+        Habit existing = aHabit(id, "Caminar", Habit.Category.MENTAL);
+        HabitInputDTO in = input("   ", Habit.Category.MENTAL.name());
+
         when(habitRepository.findById(id)).thenReturn(Optional.of(existing));
 
-        HabitInputDTO in = mock(HabitInputDTO.class);
-        when(in.getName()).thenReturn("  ");  // informado pero en blanco
-
-        assertThatThrownBy(() -> service.updateHabit(id, in))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("no puede ser vacío");
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.updateHabit(id, in));
+        assertEquals("El nombre del hábito no puede ser vacío.", ex.getMessage());
+        verify(habitRepository, never()).existsByName(anyString());
         verify(habitRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("updateHabit: falla si cambia nombre y ya existe en otro hábito")
-    void update_fail_duplicate_when_changing_name() {
-        Long id = 2L;
-        Habit existing = Habit.builder().id(id).name("A").build();
+    @DisplayName("updateHabit: cambia nombre a uno duplicado → error")
+    void update_changeNameToDuplicated() {
+        Long id = 5L;
+        Habit existing = aHabit(id, "Caminar", Habit.Category.DIET);
+        HabitInputDTO in = input("Correr", Habit.Category.DIET.name());
+
         when(habitRepository.findById(id)).thenReturn(Optional.of(existing));
+        when(habitRepository.existsByName("Correr")).thenReturn(true);
 
-        HabitInputDTO in = mock(HabitInputDTO.class);
-        when(in.getName()).thenReturn("B"); // distinto a "A" → cambiando
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.updateHabit(id, in));
+        assertEquals("El nombre del hábito ya está en uso por otro hábito.", ex.getMessage());
 
-        when(habitRepository.existsByName("B")).thenReturn(true);
-
-        assertThatThrownBy(() -> service.updateHabit(id, in))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("ya está en uso por otro hábito");
+        verify(habitRepository).existsByName("Correr");
         verify(habitRepository, never()).save(any());
     }
 
-    /* ================== DELETE ================== */
-
     @Test
-    @DisplayName("deleteHabit: feliz")
+    @DisplayName("updateHabit: ok (cambia nombre a uno disponible)")
+    void update_ok_changeName() {
+        Long id = 5L;
+        Habit existing = aHabit(id, "Caminar", Habit.Category.SLEEP);
+        HabitInputDTO in = input("Correr", Habit.Category.SLEEP.name());
+        HabitOutputDTO out = new HabitOutputDTO();
+
+        when(habitRepository.findById(id)).thenReturn(Optional.of(existing));
+        when(habitRepository.existsByName("Correr")).thenReturn(false);
+        when(habitRepository.save(existing)).thenReturn(existing);
+        when(mapper.toDto(existing)).thenReturn(out);
+
+        HabitOutputDTO res = service.updateHabit(id, in);
+
+        assertSame(out, res);
+        verify(habitRepository).existsByName("Correr");
+        verify(mapper).copyToEntity(in, existing);
+        verify(habitRepository).save(existing);
+    }
+
+    // ---------- DELETE ----------
+    @Test
+    @DisplayName("deleteHabit: ok")
     void delete_ok() {
         Long id = 7L;
-        Habit h = Habit.builder().id(id).build();
-        when(habitRepository.findById(id)).thenReturn(Optional.of(h));
+        Habit existing = aHabit(id, "Caminar", Habit.Category.MENTAL);
+        when(habitRepository.findById(id)).thenReturn(Optional.of(existing));
 
         service.deleteHabit(id);
 
-        verify(habitRepository).delete(h);
+        verify(habitRepository).delete(existing);
     }
 
     @Test
-    @DisplayName("deleteHabit: not found")
-    void delete_not_found() {
+    @DisplayName("deleteHabit: no existe → error")
+    void delete_notFound() {
         when(habitRepository.findById(7L)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.deleteHabit(7L))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Hábito no encontrado");
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.deleteHabit(7L));
+        assertEquals("Hábito no encontrado.", ex.getMessage());
+        verify(habitRepository, never()).delete(any());
     }
 
-    /* ================== FIND BY ID ================== */
-
+    // ---------- FIND BY ID ----------
     @Test
-    @DisplayName("findHabitById: feliz")
+    @DisplayName("findHabitById: ok")
     void findById_ok() {
         Long id = 3L;
-        Habit h = Habit.builder().id(id).build();
+        Habit h = aHabit(id, "Caminar", Habit.Category.PHYSICAL);
+        HabitOutputDTO out = new HabitOutputDTO();
+
         when(habitRepository.findById(id)).thenReturn(Optional.of(h));
+        when(mapper.toDto(h)).thenReturn(out);
 
-        HabitOutputDTO dto = mock(HabitOutputDTO.class);
-        when(mapper.toDto(h)).thenReturn(dto);
+        HabitOutputDTO res = service.findHabitById(id);
 
-        HabitOutputDTO out = service.findHabitById(id);
-
-        assertThat(out).isSameAs(dto);
+        assertSame(out, res);
+        verify(mapper).toDto(h);
     }
 
     @Test
-    @DisplayName("findHabitById: not found")
-    void findById_not_found() {
+    @DisplayName("findHabitById: no existe → error")
+    void findById_notFound() {
         when(habitRepository.findById(3L)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.findHabitById(3L))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Hábito no encontrado");
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.findHabitById(3L));
+        assertEquals("Hábito no encontrado.", ex.getMessage());
     }
 
-    /* ================== LIST ================== */
-
+    // ---------- LIST ----------
     @Test
-    @DisplayName("listHabits: q == null o en blanco → findAll(pageable)")
-    void list_no_q() {
-        var pageable = PageRequest.of(0, 2);
+    @DisplayName("listHabits: q vacío → findAll")
+    void list_blank() {
+        Pageable pageable = PageRequest.of(0, 10);
+        Habit h1 = aHabit(1L, "Caminar", Habit.Category.PHYSICAL);
+        Habit h2 = aHabit(2L, "Dormir", Habit.Category.SLEEP);
 
-        Habit h1 = Habit.builder().id(1L).build();
-        Habit h2 = Habit.builder().id(2L).build();
+        when(habitRepository.findAll(pageable)).thenReturn(new PageImpl<>(List.of(h1, h2)));
+        HabitOutputDTO o1 = new HabitOutputDTO();
+        HabitOutputDTO o2 = new HabitOutputDTO();
+        when(mapper.toDto(h1)).thenReturn(o1);
+        when(mapper.toDto(h2)).thenReturn(o2);
 
-        when(habitRepository.findAll(pageable))
-            .thenReturn(new PageImpl<>(List.of(h1, h2), pageable, 2));
+        Page<HabitOutputDTO> page = service.listHabits("  ", pageable);
 
-        HabitOutputDTO d1 = mock(HabitOutputDTO.class);
-        HabitOutputDTO d2 = mock(HabitOutputDTO.class);
-        when(mapper.toDto(h1)).thenReturn(d1);
-        when(mapper.toDto(h2)).thenReturn(d2);
-
-        Page<HabitOutputDTO> out1 = service.listHabits(null, pageable);
-        Page<HabitOutputDTO> out2 = service.listHabits("   ", pageable);
-
-        assertThat(out1.getContent()).containsExactly(d1, d2);
-        assertThat(out2.getContent()).containsExactly(d1, d2);
+        assertEquals(2, page.getTotalElements());
+        assertTrue(page.getContent().containsAll(List.of(o1, o2)));
+        verify(habitRepository).findAll(pageable);
     }
 
     @Test
-    @DisplayName("listHabits: q es categoría válida → findByCategory")
-    void list_category_q() {
-        var pageable = PageRequest.of(1, 3);
+    @DisplayName("listHabits: q es Category → findByCategory")
+    void list_byCategory() {
+        Pageable pageable = PageRequest.of(0, 10);
+        String q = "sleep";
+        Habit.Category cat = Habit.Category.SLEEP;
 
-        Habit h = Habit.builder().id(10L).category(Habit.Category.SLEEP).build();
-        when(habitRepository.findByCategory(Habit.Category.SLEEP, pageable))
-            .thenReturn(new PageImpl<>(List.of(h), pageable, 1));
+        Habit h1 = aHabit(1L, "Dormir bien", cat);
+        when(habitRepository.findByCategory(cat, pageable))
+                .thenReturn(new PageImpl<>(List.of(h1)));
+        HabitOutputDTO o1 = new HabitOutputDTO();
+        when(mapper.toDto(h1)).thenReturn(o1);
 
-        HabitOutputDTO d = mock(HabitOutputDTO.class);
-        when(mapper.toDto(h)).thenReturn(d);
+        Page<HabitOutputDTO> page = service.listHabits(q, pageable);
 
-        Page<HabitOutputDTO> out = service.listHabits("sleep", pageable);
-
-        assertThat(out.getContent()).containsExactly(d);
-        verify(habitRepository).findByCategory(Habit.Category.SLEEP, pageable);
+        assertEquals(1, page.getTotalElements());
+        assertSame(o1, page.getContent().get(0));
+        verify(habitRepository).findByCategory(cat, pageable);
         verify(habitRepository, never()).findByNameContainingIgnoreCase(anyString(), any());
     }
 
     @Test
-    @DisplayName("listHabits: q no es categoría → findByNameContainingIgnoreCase")
-    void list_text_q() {
-        var pageable = PageRequest.of(2, 4);
+    @DisplayName("listHabits: q no es Category → findByNameContainingIgnoreCase")
+    void list_byNameContains() {
+        Pageable pageable = PageRequest.of(0, 10);
+        String q = "cam";
 
-        Habit h = Habit.builder().id(3L).name("Tomar agua").build();
-        when(habitRepository.findByNameContainingIgnoreCase("agua", pageable))
-            .thenReturn(new PageImpl<>(List.of(h), pageable, 1));
+        Habit h1 = aHabit(1L, "Caminar", Habit.Category.PHYSICAL);
+        when(habitRepository.findByNameContainingIgnoreCase(q, pageable))
+                .thenReturn(new PageImpl<>(List.of(h1)));
+        HabitOutputDTO o1 = new HabitOutputDTO();
+        when(mapper.toDto(h1)).thenReturn(o1);
 
-        HabitOutputDTO d = mock(HabitOutputDTO.class);
-        when(mapper.toDto(h)).thenReturn(d);
+        Page<HabitOutputDTO> page = service.listHabits(q, pageable);
 
-        Page<HabitOutputDTO> out = service.listHabits("agua", pageable);
-
-        assertThat(out.getContent()).containsExactly(d);
-        verify(habitRepository).findByNameContainingIgnoreCase("agua", pageable);
+        assertEquals(1, page.getTotalElements());
+        assertSame(o1, page.getContent().get(0));
+        verify(habitRepository).findByNameContainingIgnoreCase(q, pageable);
     }
 }

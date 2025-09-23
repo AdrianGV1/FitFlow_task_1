@@ -1,26 +1,12 @@
 package una.ac.cr.FitFlow.service.Reminder;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.*;
-import static org.mockito.ArgumentMatchers.*;
-
-import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.Optional;
-
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
+import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.*;
 
 import una.ac.cr.FitFlow.dto.Reminder.ReminderInputDTO;
 import una.ac.cr.FitFlow.dto.Reminder.ReminderOutputDTO;
@@ -32,6 +18,15 @@ import una.ac.cr.FitFlow.repository.HabitRepository;
 import una.ac.cr.FitFlow.repository.ReminderRepository;
 import una.ac.cr.FitFlow.repository.UserRepository;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
 @ExtendWith(MockitoExtension.class)
 class ReminderServiceImplementationTest {
 
@@ -41,266 +36,474 @@ class ReminderServiceImplementationTest {
     @Mock private MapperForReminder mapper;
 
     @InjectMocks
-    private ReminderServiceImplementation service;
+    private ReminderServiceImplementation reminderService;
 
-    private ReminderInputDTO in(Long userId, Long habitId, String message, OffsetDateTime time, String freq) {
-        ReminderInputDTO dto = mock(ReminderInputDTO.class);
-        when(dto.getUserId()).thenReturn(userId);
-        when(dto.getHabitId()).thenReturn(habitId);
-        when(dto.getMessage()).thenReturn(message);
-        when(dto.getTime()).thenReturn(time);
-        when(dto.getFrequency()).thenReturn(freq);
-        return dto;
+    private Reminder mockReminder;
+    private ReminderInputDTO mockInputDTO;
+    private ReminderOutputDTO mockOutputDTO;
+    private User mockUser;
+    private Habit mockHabit;
+
+    // Hora fija para que no haya sorpresas de zona horaria
+    private static final OffsetDateTime FIXED_9_AM_UTC = OffsetDateTime.of(2025, 1, 1, 9, 0, 0, 0, ZoneOffset.UTC);
+
+    @BeforeEach
+    void setUp() {
+        mockUser = new User();
+        mockUser.setId(1L);
+
+        mockHabit = new Habit();
+        mockHabit.setId(1L);
+
+        mockReminder = new Reminder();
+        mockReminder.setId(1L);
+        mockReminder.setUser(mockUser);
+        mockReminder.setHabit(mockHabit);
+        mockReminder.setMessage("Test reminder");
+        mockReminder.setTime(FIXED_9_AM_UTC);
+        mockReminder.setFrequency(Reminder.Frequency.DAILY);
+
+        mockInputDTO = new ReminderInputDTO();
+        mockInputDTO.setUserId(1L);
+        mockInputDTO.setHabitId(1L);
+        mockInputDTO.setMessage("Test reminder");
+        mockInputDTO.setTime(FIXED_9_AM_UTC);
+        mockInputDTO.setFrequency("DAILY");
+
+        mockOutputDTO = ReminderOutputDTO.builder()
+                .id(1L)
+                .userId(1L)
+                .habitId(1L)
+                .message("Test reminder")
+                .time(FIXED_9_AM_UTC)
+                .frequency("DAILY")
+                .build();
     }
 
-    /* ================== CREATE ================== */
+    // ---------- CREATE ----------
     @Test
-    @DisplayName("create: feliz")
-    void create_ok() {
-        var dto = in(1L, 2L, "tomar agua", OffsetDateTime.now(), "daily");
+    @DisplayName("create: crea recordatorio con input válido (OffsetDateTime)")
+    void create_WithValidInput_ShouldCreateSuccessfully() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(mockUser));
+        when(habitRepository.findById(1L)).thenReturn(Optional.of(mockHabit));
+        when(mapper.toEntity(mockInputDTO, mockUser, mockHabit, Reminder.Frequency.DAILY)).thenReturn(mockReminder);
+        when(reminderRepository.save(mockReminder)).thenReturn(mockReminder);
+        when(mapper.toDto(mockReminder)).thenReturn(mockOutputDTO);
 
-        User u = User.builder().id(1L).build();
-        Habit h = Habit.builder().id(2L).build();
-        when(userRepository.findById(1L)).thenReturn(Optional.of(u));
-        when(habitRepository.findById(2L)).thenReturn(Optional.of(h));
+        ReminderOutputDTO result = reminderService.create(mockInputDTO);
 
-        Reminder entity = Reminder.builder().id(10L).user(u).habit(h)
-                .message("tomar agua").time(dto.getTime())
-                .frequency(Reminder.Frequency.DAILY).build();
-
-        when(mapper.toEntity(dto, u, h, Reminder.Frequency.DAILY)).thenReturn(entity);
-        when(reminderRepository.save(entity)).thenReturn(entity);
-
-        ReminderOutputDTO outDto = mock(ReminderOutputDTO.class);
-        when(mapper.toDto(entity)).thenReturn(outDto);
-
-        ReminderOutputDTO out = service.create(dto);
-        assertThat(out).isSameAs(outDto);
-
-        verify(reminderRepository).save(entity);
-    }
-
-    @Test
-    @DisplayName("create: validaciones de requeridos")
-    void create_required_validations() {
-        var now = OffsetDateTime.now();
-        assertThatThrownBy(() -> service.create(in(null, 1L, "m", now, "DAILY")))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("userId");
-        assertThatThrownBy(() -> service.create(in(1L, null, "m", now, "DAILY")))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("habitId");
-        assertThatThrownBy(() -> service.create(in(1L, 2L, "   ", now, "DAILY")))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("message");
-        assertThatThrownBy(() -> service.create(in(1L, 2L, "m", null, "DAILY")))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("time");
-        assertThatThrownBy(() -> service.create(in(1L, 2L, "m", now, "   ")))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("frequency");
-    }
-
-    @Test
-    @DisplayName("create: usuario/hábito no encontrados")
-    void create_not_found_relations() {
-        var dto = in(1L, 2L, "m", OffsetDateTime.now(), "WEEKLY");
-        when(userRepository.findById(1L)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.create(dto))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Usuario no encontrado");
-
-        when(userRepository.findById(1L)).thenReturn(Optional.of(User.builder().id(1L).build()));
-        when(habitRepository.findById(2L)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.create(dto))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Hábito no encontrado");
+        assertNotNull(result);
+        assertEquals(mockOutputDTO.getId(), result.getId());
+        assertEquals(FIXED_9_AM_UTC, result.getTime());
+        verify(userRepository).findById(1L);
+        verify(habitRepository).findById(1L);
+        verify(reminderRepository).save(mockReminder);
     }
 
     @Test
-    @DisplayName("create: frecuencia inválida")
-    void create_invalid_frequency() {
-        var dto = in(1L, 2L, "m", OffsetDateTime.now(), "monthly");
-        when(userRepository.findById(1L)).thenReturn(Optional.of(User.builder().id(1L).build()));
-        when(habitRepository.findById(2L)).thenReturn(Optional.of(Habit.builder().id(2L).build()));
+    @DisplayName("create: userId null → IllegalArgumentException")
+    void create_WithNullUserId_ShouldThrowException() {
+        mockInputDTO.setUserId(null);
 
-        assertThatThrownBy(() -> service.create(dto))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Frecuencia inválida");
-    }
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> reminderService.create(mockInputDTO));
+        assertEquals("userId es obligatorio.", ex.getMessage());
 
-    /* ================== UPDATE ================== */
-    @Test
-    @DisplayName("update: feliz sin cambiar user/habit/frequency")
-    void update_ok_no_changes() {
-        Long id = 9L;
-        Reminder current = Reminder.builder().id(id)
-                .user(User.builder().id(1L).build())
-                .habit(Habit.builder().id(2L).build())
-                .message("m").time(OffsetDateTime.now())
-                .frequency(Reminder.Frequency.WEEKLY).build();
-
-        when(reminderRepository.findById(id)).thenReturn(Optional.of(current));
-
-        var dto = in(1L, 2L, "nuevo", OffsetDateTime.now(), null); // frequency null -> no change
-        doNothing().when(mapper).copyToEntity(eq(dto), eq(current), isNull(), isNull(), isNull());
-
-        when(reminderRepository.save(current)).thenReturn(current);
-        ReminderOutputDTO outDto = mock(ReminderOutputDTO.class);
-        when(mapper.toDto(current)).thenReturn(outDto);
-
-        ReminderOutputDTO out = service.update(id, dto);
-
-        assertThat(out).isSameAs(outDto);
         verify(userRepository, never()).findById(any());
         verify(habitRepository, never()).findById(any());
-        verify(reminderRepository).save(current);
+        verify(reminderRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("update: cambia user/habit/frequency → busca, valida y copia")
-    void update_ok_with_changes() {
-        Long id = 9L;
-        Reminder current = Reminder.builder().id(id)
-                .user(User.builder().id(1L).build())
-                .habit(Habit.builder().id(2L).build())
-                .message("m").time(OffsetDateTime.now())
-                .frequency(Reminder.Frequency.DAILY).build();
+    @DisplayName("create: habitId null → IllegalArgumentException")
+    void create_WithNullHabitId_ShouldThrowException() {
+        mockInputDTO.setHabitId(null);
 
-        when(reminderRepository.findById(id)).thenReturn(Optional.of(current));
-
-        var dto = in(10L, 20L, "nuevo", OffsetDateTime.now(), "weekly"); // cambios
-
-        User uNew = User.builder().id(10L).build();
-        Habit hNew = Habit.builder().id(20L).build();
-        when(userRepository.findById(10L)).thenReturn(Optional.of(uNew));
-        when(habitRepository.findById(20L)).thenReturn(Optional.of(hNew));
-
-        doNothing().when(mapper).copyToEntity(eq(dto), eq(current), eq(uNew), eq(hNew), eq(Reminder.Frequency.WEEKLY));
-
-        when(reminderRepository.save(current)).thenReturn(current);
-        ReminderOutputDTO outDto = mock(ReminderOutputDTO.class);
-        when(mapper.toDto(current)).thenReturn(outDto);
-
-        ReminderOutputDTO out = service.update(id, dto);
-
-        assertThat(out).isSameAs(outDto);
-        verify(userRepository).findById(10L);
-        verify(habitRepository).findById(20L);
-        verify(reminderRepository).save(current);
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> reminderService.create(mockInputDTO));
+        assertEquals("habitId es obligatorio.", ex.getMessage());
     }
 
     @Test
-    @DisplayName("update: recordatorio no encontrado")
-    void update_not_found() {
-        when(reminderRepository.findById(99L)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.update(99L, in(1L, 2L, "m", OffsetDateTime.now(), "DAILY")))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Recordatorio no encontrado");
+    @DisplayName("create: message null/blank → IllegalArgumentException")
+    void create_WithNullOrBlankMessage_ShouldThrowException() {
+        mockInputDTO.setMessage(null);
+        IllegalArgumentException ex1 = assertThrows(IllegalArgumentException.class,
+                () -> reminderService.create(mockInputDTO));
+        assertEquals("message es obligatorio.", ex1.getMessage());
+
+        mockInputDTO.setMessage("   ");
+        IllegalArgumentException ex2 = assertThrows(IllegalArgumentException.class,
+                () -> reminderService.create(mockInputDTO));
+        assertEquals("message es obligatorio.", ex2.getMessage());
     }
 
     @Test
-    @DisplayName("update: nuevo userId/habitId no existen")
-    void update_new_relations_not_found() {
+    @DisplayName("create: time null → IllegalArgumentException (OffsetDateTime)")
+    void create_WithNullTime_ShouldThrowException() {
+        mockInputDTO.setTime(null);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> reminderService.create(mockInputDTO));
+        assertEquals("time es obligatorio.", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("create: frequency null/blank → IllegalArgumentException")
+    void create_WithNullOrBlankFrequency_ShouldThrowException() {
+        mockInputDTO.setFrequency(null);
+        IllegalArgumentException ex1 = assertThrows(IllegalArgumentException.class,
+                () -> reminderService.create(mockInputDTO));
+        assertEquals("frequency es obligatorio.", ex1.getMessage());
+
+        mockInputDTO.setFrequency("   ");
+        IllegalArgumentException ex2 = assertThrows(IllegalArgumentException.class,
+                () -> reminderService.create(mockInputDTO));
+        assertEquals("frequency es obligatorio.", ex2.getMessage());
+    }
+
+    @Test
+    @DisplayName("create: usuario no existe")
+    void create_WithNonExistentUser_ShouldThrowException() {
+        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> reminderService.create(mockInputDTO));
+        assertEquals("Usuario no encontrado: 1", ex.getMessage());
+
+        verify(userRepository).findById(1L);
+        verify(habitRepository, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("create: hábito no existe")
+    void create_WithNonExistentHabit_ShouldThrowException() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(mockUser));
+        when(habitRepository.findById(1L)).thenReturn(Optional.empty());
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> reminderService.create(mockInputDTO));
+        assertEquals("Hábito no encontrado: 1", ex.getMessage());
+
+        verify(userRepository).findById(1L);
+        verify(habitRepository).findById(1L);
+    }
+
+    @Test
+    @DisplayName("create: parsea frequency = WEEKLY (case-insensitive) y usa OffsetDateTime")
+    void create_ShouldParseFrequencyCorrectly_Weekly() {
+        mockInputDTO.setFrequency("weekly");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(mockUser));
+        when(habitRepository.findById(1L)).thenReturn(Optional.of(mockHabit));
+        when(reminderRepository.save(any(Reminder.class))).thenReturn(mockReminder);
+        when(mapper.toDto(any(Reminder.class))).thenReturn(mockOutputDTO);
+
+        ArgumentCaptor<Reminder.Frequency> freqCap = ArgumentCaptor.forClass(Reminder.Frequency.class);
+        when(mapper.toEntity(eq(mockInputDTO), eq(mockUser), eq(mockHabit), freqCap.capture()))
+                .thenReturn(mockReminder);
+
+        ReminderOutputDTO result = reminderService.create(mockInputDTO);
+
+        assertNotNull(result);
+        assertEquals(Reminder.Frequency.WEEKLY, freqCap.getValue());
+        assertEquals(FIXED_9_AM_UTC, mockInputDTO.getTime());
+    }
+
+    @Test
+    @DisplayName("create: frequency inválida → IllegalArgumentException")
+    void create_WithInvalidFrequency_ShouldThrowException() {
+        mockInputDTO.setFrequency("INVALID");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(mockUser));
+        when(habitRepository.findById(1L)).thenReturn(Optional.of(mockHabit));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> reminderService.create(mockInputDTO));
+        assertEquals("Frecuencia inválida. Use DAILY o WEEKLY.", ex.getMessage());
+    }
+
+    // ---------- UPDATE ----------
+    @Test
+    @DisplayName("update: ok con input válido (OffsetDateTime)")
+    void update_WithValidInput_ShouldUpdateSuccessfully() {
         Long id = 1L;
-        Reminder current = Reminder.builder().id(id).build();
-        when(reminderRepository.findById(id)).thenReturn(Optional.of(current));
+        when(reminderRepository.findById(id)).thenReturn(Optional.of(mockReminder));
+        when(reminderRepository.save(mockReminder)).thenReturn(mockReminder);
+        when(mapper.toDto(mockReminder)).thenReturn(mockOutputDTO);
 
-        var dtoU = in(10L, null, "m", OffsetDateTime.now(), null);
-        when(userRepository.findById(10L)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.update(id, dtoU))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Usuario no encontrado");
+        ReminderOutputDTO result = reminderService.update(id, mockInputDTO);
 
-        var dtoH = in(null, 20L, "m", OffsetDateTime.now(), null);
-        when(habitRepository.findById(20L)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.update(id, dtoH))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Hábito no encontrado");
+        assertNotNull(result);
+        verify(reminderRepository).findById(id);
+        verify(mapper).copyToEntity(mockInputDTO, mockReminder, null, null, Reminder.Frequency.DAILY);
+        verify(reminderRepository).save(mockReminder);
     }
 
     @Test
-    @DisplayName("update: frecuencia inválida al cambiar")
-    void update_invalid_frequency() {
+    @DisplayName("update: recordatorio no existe")
+    void update_WithNonExistentReminder_ShouldThrowException() {
+        Long id = 999L;
+        when(reminderRepository.findById(id)).thenReturn(Optional.empty());
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> reminderService.update(id, mockInputDTO));
+        assertEquals("Recordatorio no encontrado: 999", ex.getMessage());
+
+        verify(reminderRepository).findById(id);
+        verify(reminderRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("update: cambia userId → busca nuevo usuario")
+    void update_WithChangedUserId_ShouldFetchNewUser() {
         Long id = 1L;
-        Reminder current = Reminder.builder().id(id).build();
-        when(reminderRepository.findById(id)).thenReturn(Optional.of(current));
+        User newUser = new User(); newUser.setId(2L);
+        mockInputDTO.setUserId(2L);
 
-        var dto = in(null, null, "m", OffsetDateTime.now(), "monthly"); // inválida
-        assertThatThrownBy(() -> service.update(id, dto))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Frecuencia inválida");
-    }
+        when(reminderRepository.findById(id)).thenReturn(Optional.of(mockReminder));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(newUser));
+        when(reminderRepository.save(mockReminder)).thenReturn(mockReminder);
+        when(mapper.toDto(mockReminder)).thenReturn(mockOutputDTO);
 
-    /* ================== DELETE ================== */
-    @Test
-    @DisplayName("delete: feliz")
-    void delete_ok() {
-        when(reminderRepository.existsById(7L)).thenReturn(true);
-        service.delete(7L);
-        verify(reminderRepository).deleteById(7L);
-    }
+        ReminderOutputDTO result = reminderService.update(id, mockInputDTO);
 
-    @Test
-    @DisplayName("delete: no encontrado")
-    void delete_not_found() {
-        when(reminderRepository.existsById(7L)).thenReturn(false);
-        assertThatThrownBy(() -> service.delete(7L))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Recordatorio no encontrado");
-        verify(reminderRepository, never()).deleteById(anyLong());
-    }
-
-    /* ================== FIND / LIST ================== */
-    @Test
-    @DisplayName("findById: feliz y not found")
-    void findById_ok_and_notFound() {
-        Reminder r = Reminder.builder().id(3L).build();
-        when(reminderRepository.findById(3L)).thenReturn(Optional.of(r));
-        ReminderOutputDTO dto = mock(ReminderOutputDTO.class);
-        when(mapper.toDto(r)).thenReturn(dto);
-
-        assertThat(service.findById(3L)).isSameAs(dto);
-
-        when(reminderRepository.findById(4L)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.findById(4L))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Recordatorio no encontrado");
+        assertNotNull(result);
+        verify(userRepository).findById(2L);
+        verify(mapper).copyToEntity(mockInputDTO, mockReminder, newUser, null, Reminder.Frequency.DAILY);
     }
 
     @Test
-    @DisplayName("list: findAll(pageable) y mapea")
-    void list_ok() {
-        var pageable = PageRequest.of(0, 2);
-        Reminder r1 = Reminder.builder().id(1L).build();
-        Reminder r2 = Reminder.builder().id(2L).build();
-        when(reminderRepository.findAll(pageable))
-                .thenReturn(new PageImpl<>(List.of(r1, r2), pageable, 2));
+    @DisplayName("update: cambia habitId → busca nuevo hábito")
+    void update_WithChangedHabitId_ShouldFetchNewHabit() {
+        Long id = 1L;
+        Habit newHabit = new Habit(); newHabit.setId(2L);
+        mockInputDTO.setHabitId(2L);
 
-        ReminderOutputDTO d1 = mock(ReminderOutputDTO.class);
-        ReminderOutputDTO d2 = mock(ReminderOutputDTO.class);
-        when(mapper.toDto(r1)).thenReturn(d1);
-        when(mapper.toDto(r2)).thenReturn(d2);
+        when(reminderRepository.findById(id)).thenReturn(Optional.of(mockReminder));
+        when(habitRepository.findById(2L)).thenReturn(Optional.of(newHabit));
+        when(reminderRepository.save(mockReminder)).thenReturn(mockReminder);
+        when(mapper.toDto(mockReminder)).thenReturn(mockOutputDTO);
 
-        Page<ReminderOutputDTO> out = service.list(pageable);
+        ReminderOutputDTO result = reminderService.update(id, mockInputDTO);
 
-        assertThat(out.getContent()).containsExactly(d1, d2);
-        assertThat(out.getTotalElements()).isEqualTo(2);
+        assertNotNull(result);
+        verify(habitRepository).findById(2L);
+        verify(mapper).copyToEntity(mockInputDTO, mockReminder, null, newHabit, Reminder.Frequency.DAILY);
     }
 
     @Test
-    @DisplayName("listByUserId: delega y mapea")
-    void listByUserId_ok() {
-        var pageable = PageRequest.of(1, 3);
-        Reminder r = Reminder.builder().id(1L).build();
-        when(reminderRepository.findByUser_Id(9L, pageable))
-                .thenReturn(new PageImpl<>(List.of(r), pageable, 1));
+    @DisplayName("update: mismo userId → no vuelve a buscar usuario")
+    void update_WithSameUserId_ShouldNotFetchUser() {
+        Long id = 1L;
+        when(reminderRepository.findById(id)).thenReturn(Optional.of(mockReminder));
+        when(reminderRepository.save(mockReminder)).thenReturn(mockReminder);
+        when(mapper.toDto(mockReminder)).thenReturn(mockOutputDTO);
 
-        ReminderOutputDTO d = mock(ReminderOutputDTO.class);
-        when(mapper.toDto(r)).thenReturn(d);
+        ReminderOutputDTO result = reminderService.update(id, mockInputDTO);
 
-        Page<ReminderOutputDTO> out = service.listByUserId(9L, pageable);
-        assertThat(out.getContent()).containsExactly(d);
+        assertNotNull(result);
+        verify(userRepository, never()).findById(any());
+        verify(mapper).copyToEntity(mockInputDTO, mockReminder, null, null, Reminder.Frequency.DAILY);
     }
 
     @Test
-    @DisplayName("listByHabitId: delega y mapea")
-    void listByHabitId_ok() {
-        var pageable = PageRequest.of(0, 5);
-        Reminder r = Reminder.builder().id(1L).build();
-        when(reminderRepository.findByHabit_Id(33L, pageable))
-                .thenReturn(new PageImpl<>(List.of(r), pageable, 1));
+    @DisplayName("update: input con valores nulos opcionales → maneja sin error")
+    void update_WithNullValues_ShouldHandleGracefully() {
+        Long id = 1L;
+        ReminderInputDTO updateInput = new ReminderInputDTO();
+        when(reminderRepository.findById(id)).thenReturn(Optional.of(mockReminder));
+        when(reminderRepository.save(mockReminder)).thenReturn(mockReminder);
+        when(mapper.toDto(mockReminder)).thenReturn(mockOutputDTO);
 
-        ReminderOutputDTO d = mock(ReminderOutputDTO.class);
-        when(mapper.toDto(r)).thenReturn(d);
+        ReminderOutputDTO result = reminderService.update(id, updateInput);
 
-        Page<ReminderOutputDTO> out = service.listByHabitId(33L, pageable);
-        assertThat(out.getContent()).containsExactly(d);
+        assertNotNull(result);
+        verify(mapper).copyToEntity(updateInput, mockReminder, null, null, null);
+    }
+
+    @Test
+    @DisplayName("update: nuevo usuario no existe")
+    void update_WithNonExistentNewUser_ShouldThrowException() {
+        Long id = 1L;
+        mockInputDTO.setUserId(999L);
+
+        when(reminderRepository.findById(id)).thenReturn(Optional.of(mockReminder));
+        when(userRepository.findById(999L)).thenReturn(Optional.empty());
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> reminderService.update(id, mockInputDTO));
+        assertEquals("Usuario no encontrado: 999", ex.getMessage());
+
+        verify(userRepository).findById(999L);
+        verify(reminderRepository, never()).save(any());
+    }
+
+    // ---------- DELETE ----------
+    @Test
+    @DisplayName("delete: elimina cuando existe")
+    void delete_WithExistingReminder_ShouldDeleteSuccessfully() {
+        Long id = 1L;
+        when(reminderRepository.existsById(id)).thenReturn(true);
+
+        reminderService.delete(id);
+
+        verify(reminderRepository).existsById(id);
+        verify(reminderRepository).deleteById(id);
+    }
+
+    @Test
+    @DisplayName("delete: no existe → IllegalArgumentException")
+    void delete_WithNonExistentReminder_ShouldThrowException() {
+        Long id = 999L;
+        when(reminderRepository.existsById(id)).thenReturn(false);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> reminderService.delete(id));
+        assertEquals("Recordatorio no encontrado: 999", ex.getMessage());
+
+        verify(reminderRepository).existsById(id);
+        verify(reminderRepository, never()).deleteById(any());
+    }
+
+    // ---------- FIND BY ID ----------
+    @Test
+    @DisplayName("findById: retorna cuando existe")
+    void findById_WithExistingReminder_ShouldReturnReminder() {
+        Long id = 1L;
+        when(reminderRepository.findById(id)).thenReturn(Optional.of(mockReminder));
+        when(mapper.toDto(mockReminder)).thenReturn(mockOutputDTO);
+
+        ReminderOutputDTO result = reminderService.findById(id);
+
+        assertNotNull(result);
+        assertEquals(mockOutputDTO.getId(), result.getId());
+        assertEquals(FIXED_9_AM_UTC, result.getTime());
+
+        verify(reminderRepository).findById(id);
+    }
+
+    @Test
+    @DisplayName("findById: no existe → IllegalArgumentException")
+    void findById_WithNonExistentReminder_ShouldThrowException() {
+        Long id = 999L;
+        when(reminderRepository.findById(id)).thenReturn(Optional.empty());
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> reminderService.findById(id));
+        assertEquals("Recordatorio no encontrado: 999", ex.getMessage());
+
+        verify(reminderRepository).findById(id);
+    }
+
+    // ---------- LIST ----------
+    @Test
+    @DisplayName("list: devuelve página paginada")
+    void list_ShouldReturnPaginatedReminders() {
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Reminder> page = new PageImpl<>(List.of(mockReminder));
+
+        when(reminderRepository.findAll(any(Pageable.class))).thenReturn(page);
+        when(mapper.toDto(mockReminder)).thenReturn(mockOutputDTO);
+
+        Page<ReminderOutputDTO> result = reminderService.list(pageable);
+
+        assertNotNull(result);
+        assertEquals(1, result.getContent().size());
+        assertEquals(mockOutputDTO.getId(), result.getContent().get(0).getId());
+
+        verify(reminderRepository).findAll(pageable);
+    }
+
+    @Test
+    @DisplayName("list: página vacía cuando no hay recordatorios")
+    void list_WithNoReminders_ShouldReturnEmptyPage() {
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Reminder> empty = new PageImpl<>(List.of());
+
+        when(reminderRepository.findAll(any(Pageable.class))).thenReturn(empty);
+
+        Page<ReminderOutputDTO> result = reminderService.list(pageable);
+
+        assertNotNull(result);
+        assertTrue(result.getContent().isEmpty());
+        assertEquals(0, result.getTotalElements());
+    }
+
+    @Test
+    @DisplayName("listByUserId: por usuario")
+    void listByUserId_WithValidUserId_ShouldReturnUserReminders() {
+        Long userId = 1L;
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Reminder> page = new PageImpl<>(List.of(mockReminder));
+
+        when(reminderRepository.findByUser_Id(eq(userId), any(Pageable.class))).thenReturn(page);
+        when(mapper.toDto(mockReminder)).thenReturn(mockOutputDTO);
+
+        Page<ReminderOutputDTO> result = reminderService.listByUserId(userId, pageable);
+
+        assertNotNull(result);
+        assertEquals(1, result.getContent().size());
+        assertEquals(userId, result.getContent().get(0).getUserId());
+
+        verify(reminderRepository).findByUser_Id(userId, pageable);
+    }
+
+    @Test
+    @DisplayName("listByUserId: vacío cuando el usuario no tiene recordatorios")
+    void listByUserId_WithUserHavingNoReminders_ShouldReturnEmptyPage() {
+        Long userId = 1L;
+        Pageable pageable = PageRequest.of(0, 10);
+        when(reminderRepository.findByUser_Id(eq(userId), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        Page<ReminderOutputDTO> result = reminderService.listByUserId(userId, pageable);
+
+        assertNotNull(result);
+        assertTrue(result.getContent().isEmpty());
+        assertEquals(0, result.getTotalElements());
+    }
+
+    @Test
+    @DisplayName("listByHabitId: por hábito")
+    void listByHabitId_WithValidHabitId_ShouldReturnHabitReminders() {
+        Long habitId = 1L;
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Reminder> page = new PageImpl<>(List.of(mockReminder));
+
+        when(reminderRepository.findByHabit_Id(eq(habitId), any(Pageable.class))).thenReturn(page);
+        when(mapper.toDto(mockReminder)).thenReturn(mockOutputDTO);
+
+        Page<ReminderOutputDTO> result = reminderService.listByHabitId(habitId, pageable);
+
+        assertNotNull(result);
+        assertEquals(1, result.getContent().size());
+        assertEquals(habitId, result.getContent().get(0).getHabitId());
+
+        verify(reminderRepository).findByHabit_Id(habitId, pageable);
+    }
+
+    @Test
+    @DisplayName("listByHabitId: vacío cuando el hábito no tiene recordatorios")
+    void listByHabitId_WithHabitHavingNoReminders_ShouldReturnEmptyPage() {
+        Long habitId = 1L;
+        Pageable pageable = PageRequest.of(0, 10);
+        when(reminderRepository.findByHabit_Id(eq(habitId), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        Page<ReminderOutputDTO> result = reminderService.listByHabitId(habitId, pageable);
+
+        assertNotNull(result);
+        assertTrue(result.getContent().isEmpty());
+        assertEquals(0, result.getTotalElements());
+    }
+
+    // ---------- Helpers ----------
+    private ReminderInputDTO createReminderInputDTO(String frequency) {
+        ReminderInputDTO dto = new ReminderInputDTO();
+        dto.setUserId(1L);
+        dto.setHabitId(1L);
+        dto.setMessage("Test");
+        dto.setTime(FIXED_9_AM_UTC);
+        dto.setFrequency(frequency);
+        return dto;
     }
 }
